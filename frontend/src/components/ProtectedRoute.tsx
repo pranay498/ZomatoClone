@@ -1,0 +1,30 @@
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useApp } from "../Context/MainContext";
+
+const ProtectedRoute = () => {
+  const { isAuth, user, loading } = useApp();
+  const location = useLocation();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  // 🔐 Not logged in
+  if (!isAuth) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // 🔥 ROLE NOT SELECTED → FORCE /select-role
+  if (!user?.role && location.pathname !== "/select-role") {
+    return <Navigate to="/select-role" replace />;
+  }
+
+  // 🔥 ROLE ALREADY SELECTED → BLOCK /select-role
+  if (user?.role && location.pathname === "/select-role") {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
+};
+
+export default ProtectedRoute;
