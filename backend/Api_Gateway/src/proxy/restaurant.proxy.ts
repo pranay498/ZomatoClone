@@ -16,6 +16,12 @@ export const restaurantProxy = proxy(RESTAURANT_SERVICE_URL, {
       newPath = req.originalUrl.replace("/api/v1/menu", "/menu");
     } else if (req.originalUrl.startsWith("/api/v1/cart")) {
       newPath = req.originalUrl.replace("/api/v1/cart", "/cart");
+    } else if (req.originalUrl.startsWith("/api/v1/user/address")) {
+      newPath = req.originalUrl.replace("/api/v1/user/address", "/address");
+    } else if (req.originalUrl.startsWith("/api/v1/checkout")) {
+      newPath = req.originalUrl.replace("/api/v1/checkout", "/checkout");
+    } else if (req.originalUrl.startsWith("/api/v1/orders")) {
+      newPath = req.originalUrl.replace("/api/v1/orders", "/orders");
     }
 
     console.log(

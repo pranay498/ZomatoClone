@@ -3,23 +3,31 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../Context/MainContext";
 import { ICartItem } from "../types";
 import apiClient from "../services/apiClient";
+import { createRazorpayOrder, verifyRazorpayPayment } from "../services/api";
 
 // ── Checkout data interface ──
 interface CheckoutData {
-  address: string;
-  landmark: string;
-  pincode: string;
-  addressType: "home" | "work" | "other";
+  addressId: string; // Changed: MongoDB ObjectId of saved address
   paymentMethod: "cod" | "upi" | "card";
+  addressLine1?: string; // For reference/backup
+  addressLine2?: string;
+  landmark?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  addressType?: "home" | "work" | "other";
+  lat?: number;
+  lng?: number;
+  phoneNumber?: string;
 }
 
 // ── Styling constants ──────────────────────────────────────────────
-const gold       = "#d4af64";
+const gold = "#d4af64";
 const goldBorder = "rgba(212,175,100,0.25)";
-const goldFaint  = "rgba(212,175,100,0.06)";
-const textMuted  = "rgba(200,175,130,0.5)";
-const textBody   = "rgba(200,175,130,0.7)";
-const cardBg     = "linear-gradient(155deg, rgba(20,15,7,0.98) 0%, rgba(11,8,3,0.99) 100%)";
+const goldFaint = "rgba(212,175,100,0.06)";
+const textMuted = "rgba(200,175,130,0.5)";
+const textBody = "rgba(200,175,130,0.7)";
+const cardBg = "linear-gradient(155deg, rgba(20,15,7,0.98) 0%, rgba(11,8,3,0.99) 100%)";
 
 const CHECKOUT_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -110,6 +118,17 @@ const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; step: numb
   </div>
 );
 
+// ── Razorpay Script Loader ──
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
@@ -163,7 +182,7 @@ const CheckoutPage: React.FC = () => {
   // ── Calculations ──
   const subtotal = useMemo(() =>
     cartData?.items.reduce((sum, i) => sum + i.price * i.quantity, 0) ?? 0
-  , [cartData]);
+    , [cartData]);
 
   const deliveryFee = subtotal > 500 ? 0 : 40;
   const platformFee = 5;
@@ -172,32 +191,76 @@ const CheckoutPage: React.FC = () => {
   const grandTotal = subtotal + deliveryFee + platformFee + gst + tip;
   const totalItems = cartData?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
 
-  // ── Razorpay Integration Placeholder ──
-  // TODO: Integrate Razorpay payment gateway here
+  // ── Razorpay Integration ──
   const handleRazorpayPayment = async (amount: number): Promise<boolean> => {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       console.log("[Razorpay] Opening payment gateway for amount: ₹" + amount);
-      
-      // PLACEHOLDER FOR RAZORPAY INTEGRATION
-      // Load Razorpay script: https://checkout.razorpay.com/v1/checkout.js
-      // Create order endpoint: POST /api/orders/create-razorpay-order
-      // Handle payment response and verify with backend
-      
-      // Example structure (to be implemented):
-      // const options = {
-      //   key: "YOUR_RAZORPAY_KEY",
-      //   amount: amount * 100, // in paise
-      //   currency: "INR",
-      //   name: "Zomato Clone",
-      //   handler: (response) => { resolve(true); },
-      //   prefill: { email: user?.email },
-      //   theme: { color: "#d4af64" }
-      // };
-      // const razorpay = new window.Razorpay(options);
-      // razorpay.open();
-      
-      alert("Razorpay integration ready. Please implement payment handler.");
-      resolve(false);
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        alert("Razorpay SDK failed to load. Please check your connection.");
+        return resolve(false);
+      }
+
+      try {
+        console.log("🔵 [Razorpay] Creating order on backend...");
+        const orderData = await createRazorpayOrder(amount);
+
+        if (!orderData.success) {
+          alert("Failed to create Razorpay order");
+          return resolve(false);
+        }
+
+        const options = {
+          key: (import.meta as any).env.VITE_RAZORPAY_KEY_ID || "rzp_test_placeholder",
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "Zomato Clone",
+          description: "Food Delivery Payment",
+          order_id: orderData.orderId,
+          handler: async function (response: any) {
+            console.log("🔵 [Razorpay] Payment successful, verifying signature...", response);
+            try {
+              const verifyRes = await verifyRazorpayPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              });
+
+              if (verifyRes.success) {
+                console.log("✅ [Razorpay] Verification successful");
+                resolve(true);
+              } else {
+                console.error("❌ [Razorpay] Verification failed:", verifyRes.message);
+                resolve(false);
+              }
+            } catch (err) {
+              console.error("❌ [Razorpay] Verification caught error:", err);
+              resolve(false);
+            }
+          },
+          prefill: {
+            name: user?.firstName || "Guest User",
+            email: user?.email || "guest@example.com"
+          },
+          theme: {
+            color: "#d4af64"
+          }
+        };
+
+        const paymentObject = new (window as any).Razorpay(options);
+
+        paymentObject.on('payment.failed', function (response: any) {
+          console.error("❌ [Razorpay] Payment failed event:", response.error);
+          resolve(false);
+        });
+
+        paymentObject.open();
+
+      } catch (err) {
+        console.error("❌ [Razorpay] Payment setup error:", err);
+        resolve(false);
+      }
     });
   };
 
@@ -215,7 +278,7 @@ const CheckoutPage: React.FC = () => {
       console.log("🛒 [Checkout] Cart items:", cartData?.items);
       console.log("🛒 [Checkout] Restaurant:", cartData?.restaurantName);
       console.log("🛒 [Checkout] Payment method:", checkoutData.paymentMethod);
-      console.log("🛒 [Checkout] Delivery address:", checkoutData.address);
+      console.log("🛒 [Checkout] Delivery address:", checkoutData.addressLine1);
       console.log("🛒 [Checkout] Grand total: ₹" + grandTotal);
 
       // Handle payment based on method
@@ -247,20 +310,17 @@ const CheckoutPage: React.FC = () => {
       const syncRes = await apiClient.post("/cart/sync", syncPayload);
       console.log("✅ [Checkout] Cart synced successfully:", syncRes.data);
 
-      // Create order with address and payment details
+      // Create order with addressId and payment details (improved validation)
       const orderPayload = {
-        address: checkoutData.address,
-        landmark: checkoutData.landmark,
-        pincode: checkoutData.pincode,
-        addressType: checkoutData.addressType,
+        addressId: checkoutData.addressId, // ← MongoDB ObjectId of saved address
         paymentMethod: checkoutData.paymentMethod,
-        tip: tip,
         totalAmount: grandTotal,
+        // userPhone is optional, can be added if we have contact info
       };
 
-      console.log("🔵 [Checkout] Creating order...", orderPayload);
-      // const orderRes = await apiClient.post("/orders/create", orderPayload);
-      // console.log("✅ [Checkout] Order created:", orderRes.data);
+      console.log("🔵 [Checkout] Creating order with validated address...", orderPayload);
+      const orderRes = await apiClient.post("/order/create", orderPayload);
+      console.log("✅ [Checkout] Order created:", orderRes.data);
 
       // Clear cart from backend
       console.log("🔵 [Checkout] Clearing cart from backend...");
@@ -483,12 +543,12 @@ const CheckoutPage: React.FC = () => {
                       <div>
                         <p style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(200,175,130,0.45)", marginBottom: 6 }}>Address Type</p>
                         <p style={{ color: "#f0e6cc", fontSize: 14, fontWeight: 500 }}>
-                          {checkoutData.addressType === "home" ? "🏠" : checkoutData.addressType === "work" ? "🏢" : "📍"} {checkoutData.addressType.charAt(0).toUpperCase() + checkoutData.addressType.slice(1)}
+                          {checkoutData.addressType === "home" ? "🏠" : checkoutData.addressType === "work" ? "🏢" : "📍"} {checkoutData.addressType ? checkoutData.addressType.charAt(0).toUpperCase() + checkoutData.addressType.slice(1) : "Other"}
                         </p>
                       </div>
                       <div>
                         <p style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(200,175,130,0.45)", marginBottom: 6 }}>Street Address</p>
-                        <p style={{ color: "#f0e6cc", fontSize: 13, lineHeight: 1.5 }}>{checkoutData.address}</p>
+                        <p style={{ color: "#f0e6cc", fontSize: 13, lineHeight: 1.5 }}>{checkoutData.addressLine1}</p>
                       </div>
                       {checkoutData.landmark && (
                         <div>

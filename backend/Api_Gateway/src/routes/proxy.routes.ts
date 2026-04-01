@@ -19,4 +19,9 @@ router.use("/menu", verifyToken, restaurantProxy);
 // Cart service routes (protected)
 router.use("/cart", verifyToken, restaurantProxy);
 
+// Address and Checkout routes -> handled by restaurant service
+router.use("/user/address", verifyToken, restaurantProxy);
+router.use("/checkout", verifyToken, restaurantProxy);
+router.use("/orders", verifyToken, restaurantProxy);
+
 export default router;

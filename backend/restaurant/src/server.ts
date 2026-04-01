@@ -8,6 +8,9 @@ import { errorHandler } from "./middlewares/error.middleware";
 import restaurantRoutes from "./routes/restaurant.routes";
 import menuRoutes from "./routes/menu.routes";
 import cartRoutes from "./routes/cart.routes";
+import addressRoutes from "./routes/address.routes";
+import checkoutRoutes from "./routes/checkout.routes";
+import orderRoutes from "./routes/order.routes";
 
 const app = express();
 
@@ -50,6 +53,15 @@ app.use("/menu", menuRoutes);
 
 // Cart routes
 app.use("/cart", cartRoutes);
+
+// Address routes
+app.use("/address", addressRoutes);
+
+// Checkout routes
+app.use("/checkout", checkoutRoutes);
+
+// Order routes
+app.use("/orders", orderRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
