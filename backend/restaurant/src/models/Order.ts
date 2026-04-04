@@ -7,7 +7,7 @@ export interface IOrder extends Document {
 
   // Rider information (Will be populated later via RabbitMQ/Socket)
   riderId?: string | null;
-  riderPhone?: string | null;  // Changed to string for better phone number formatting
+  riderPhone?: string | null; // Changed to string for better phone number formatting
   riderName?: string | null;
 
   // The food items they bought
@@ -23,7 +23,7 @@ export interface IOrder extends Document {
 
   // Specific delivery structure expected by Rider Service
   deliveryAddress: {
-    formattedAddress: string;  // Note: Fixed typo from 'fromattedAddress' in screenshot
+    formattedAddress: string; // Note: Fixed typo from 'fromattedAddress' in screenshot
     mobile: number;
     latitude: number;
     longitude: number;
@@ -33,7 +33,15 @@ export interface IOrder extends Document {
   paymentId?: string; // Store Razorpay Payment ID if paid online
   paymentStatus: "pending" | "paid" | "failed";
 
-  status: "placed" | "accepted" | "preparing" | "ready_for_rider" | "rider_assigned" | "picked_up" | "delivered" | "cancelled";
+  status:
+    | "placed"
+    | "accepted"
+    | "preparing"
+    | "ready_for_rider"
+    | "rider_assigned"
+    | "picked_up"
+    | "delivered"
+    | "cancelled";
 
   totalAmount: number;
 
@@ -55,55 +63,76 @@ const OrderSchema: Schema = new Schema(
     // Items
     items: [
       {
-        itemId: { type: String, required: true },
+        itemId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "MenuItem", // 👈 IMPORTANT
+          required: true,
+        },
         name: { type: String, required: true },
         price: { type: Number, required: true },
-        quantity: { type: Number, required: true, default: 1 }
-      }
+        quantity: { type: Number, required: true, default: 1 },
+      },
     ],
 
     // Checkout Details
-    addressId: { 
+    addressId: {
       type: Schema.Types.ObjectId,
       ref: "Address",
       required: [true, "Address ID is required"],
-      index: true
+      index: true,
     },
 
     // Rider Service Address Structure
     deliveryAddress: {
-      formattedAddress: { 
-        type: String, 
-        required: [true, "Formatted address is required"] 
+      formattedAddress: {
+        type: String,
+        required: [true, "Formatted address is required"],
       },
-      mobile: { 
-        type: Number, 
-        required: [true, "Phone number is required"]
+      mobile: {
+        type: Number,
+        required: [true, "Phone number is required"],
       },
-      latitude: { 
-        type: Number, 
+      latitude: {
+        type: Number,
         required: [true, "Latitude is required"],
-        default: 0
+        default: 0,
       },
-      longitude: { 
-        type: Number, 
+      longitude: {
+        type: Number,
         required: [true, "Longitude is required"],
-        default: 0
-      }
+        default: 0,
+      },
     },
 
-    paymentMethod: { type: String, enum: ["cod", "upi", "card"], required: true },
+    paymentMethod: {
+      type: String,
+      enum: ["cod", "upi", "card"],
+      required: true,
+    },
     paymentId: { type: String, default: null }, // e.g. "pay_N2abc12345"
-    paymentStatus: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
+      default: "pending",
+    },
 
     status: {
       type: String,
-      enum: ["placed", "accepted", "preparing", "ready_for_rider", "rider_assigned", "picked_up", "delivered", "cancelled"],
-      default: "placed"
+      enum: [
+        "placed",
+        "accepted",
+        "preparing",
+        "ready_for_rider",
+        "rider_assigned",
+        "picked_up",
+        "delivered",
+        "cancelled",
+      ],
+      default: "placed",
     },
-    totalAmount: { type: Number, required: true }
+    totalAmount: { type: Number, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export const Order = mongoose.model<IOrder>("Order", OrderSchema);

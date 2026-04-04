@@ -263,9 +263,10 @@ const AddressPaymentPage: React.FC = () => {
     if (!city.trim()) { setError("Please enter your city"); return; }
     if (!state.trim()) { setError("Please enter your state"); return; }
     if (!pincode.trim()) { setError("Please enter your pincode"); return; }
-    if (!phoneNumber.trim()) { setError("Please enter your phone number"); return; } // ← NEW: Validate phone
+    if (!phoneNumber.trim()) { setError("Please enter your phone number"); return; }
 
     setPlacing(true);
+    let addressId: string | undefined;
     try {
       // ── Step 1: Save address to backend ──
       const addressPayload: AddressPayload = {
@@ -278,39 +279,64 @@ const AddressPaymentPage: React.FC = () => {
         addressType,
         coordinates: markerPos ?? null,
       };
+      console.log("📍 [AddressPayment] Saving address...", addressPayload);
       const addrRes = await validateAndSaveAddress(addressPayload);
+      console.log("📍 [AddressPayment] Address response:", addrRes);
+      
       if (!addrRes.success) {
         setError(addrRes.message ?? "Address validation failed");
         setPlacing(false);
         return;
       }
+      
+      // ✅ Capture addressId if save was successful
+      addressId = addrRes.addressId;
+      console.log("📍 [AddressPayment] Address saved with ID:", addressId);
 
+      // ── Step 2: Save payment method ──
+      console.log("💳 [AddressPayment] Saving payment method...");
       const payRes = await savePaymentMethod({ paymentMethod });
+      console.log("💳 [AddressPayment] Payment response:", payRes);
+      
       if (!payRes.success) {
         setError(payRes.message ?? "Payment setup failed");
         setPlacing(false);
         return;
       }
 
-      // ← CRITICAL FIX: Save addressId for checkout
-      sessionStorage.setItem("checkoutAddressPayment", JSON.stringify({
-        addressId: addrRes.addressId, // ← Store for order creation
+      // ✅ Save checkout data with addressId
+      const checkoutData = {
+        addressId, // ← Include captured addressId
         paymentMethod,
-        addressLine1, city, state, pincode, // ← For reference
+        addressLine1, city, state, pincode,
         lat: markerPos?.lat, lng: markerPos?.lng,
         checkoutToken: payRes.checkoutToken,
-        phoneNumber, // ← NEW: For delivery contact
-      }));
+        phoneNumber,
+      };
+      console.log("✅ [AddressPayment] Saving checkout data:", checkoutData);
+      sessionStorage.setItem("checkoutAddressPayment", JSON.stringify(checkoutData));
 
       navigate("/checkout");
-    } catch (err) {
-      console.error(err);
-      // ── Fallback: if backend is unreachable, still allow flow ──
-      sessionStorage.setItem("checkoutAddressPayment", JSON.stringify({
+    } catch (err: any) {
+      console.error("❌ [AddressPayment] Error:", err?.message || err);
+      console.error("❌ [AddressPayment] Response data:", err?.response?.data);
+      
+      // ── Fallback: if backend fails but address was saved, still proceed with addressId ──
+      const checkoutDataFallback: any = {
         addressLine1, addressLine2, landmark, city, state, pincode,
         addressType, paymentMethod,
         lat: markerPos?.lat, lng: markerPos?.lng,
-      }));
+      };
+      
+      // ✅ Include addressId in fallback if it was successfully saved
+      if (addressId) {
+        checkoutDataFallback.addressId = addressId;
+        console.log("✅ [AddressPayment] Fallback: Using saved addressId:", addressId);
+      } else {
+        console.warn("⚠️ [AddressPayment] Fallback: No addressId available");
+      }
+      
+      sessionStorage.setItem("checkoutAddressPayment", JSON.stringify(checkoutDataFallback));
       navigate("/checkout");
     } finally {
       setPlacing(false);

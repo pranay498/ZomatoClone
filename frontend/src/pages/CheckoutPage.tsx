@@ -319,7 +319,7 @@ const CheckoutPage: React.FC = () => {
       };
 
       console.log("🔵 [Checkout] Creating order with validated address...", orderPayload);
-      const orderRes = await apiClient.post("/order/create", orderPayload);
+      const orderRes = await apiClient.post("/orders/create", orderPayload);
       console.log("✅ [Checkout] Order created:", orderRes.data);
 
       // Clear cart from backend

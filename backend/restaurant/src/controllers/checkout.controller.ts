@@ -10,7 +10,7 @@ const razorpay = new Razorpay({
 
 export const savePaymentMethod = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.headers["x-user-id"] as string;
+        const userId = (req as any).userId; // From requireAuth middleware
         
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });
@@ -44,7 +44,7 @@ export const savePaymentMethod = async (req: Request, res: Response): Promise<vo
  */
 export const createRazorpayOrder = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.headers["x-user-id"] as string;
+        const userId = (req as any).userId; // From requireAuth middleware
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });
             return;
@@ -85,7 +85,7 @@ export const createRazorpayOrder = async (req: Request, res: Response): Promise<
  */
 export const verifyRazorpayPayment = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.headers["x-user-id"] as string;
+        const userId = (req as any).userId; // From requireAuth middleware
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });
             return;

@@ -22,12 +22,17 @@ apiClient.interceptors.request.use(
   }
 );
 
-
+// Response Interceptor
 apiClient.interceptors.response.use(
   (response) => {
+    // Log successful responses for debugging
+    console.log("[API] Response successful:", response.status, response.config.url);
     return response;
   },
   (error) => {
+    // Log error details
+    console.error("[API] Response error:", error.config?.url, error.response?.status);
+    
     // If 401, clear tokens and redirect to login
     if (error.response?.status === 401) {
       localStorage.removeItem("accessToken");

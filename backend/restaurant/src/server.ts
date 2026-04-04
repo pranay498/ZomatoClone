@@ -30,8 +30,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     next();
 });
 
+
 app.use(cors({
-    origin: "*",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
 }));
 
@@ -67,7 +68,7 @@ app.use("/orders", orderRoutes);
 app.use(errorHandler);
 
 
-const PORT = process.env.PORT || 8002;
+const PORT = process.env.PORT || 8005;
 
 app.listen(PORT, () => {
     console.log(`Restaurant Service running on port ${PORT}`);
