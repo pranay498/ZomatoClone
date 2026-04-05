@@ -90,22 +90,17 @@ export const restaurantProxy = proxy(RESTAURANT_SERVICE_URL, {
 
   proxyReqBodyDecorator: (bodyContent, srcReq) => {
     console.log("🟡 [API Gateway] proxyReqBodyDecorator called");
-    // Don't decorate multipart/form-data requests - they need raw stream
+    
     const contentType = srcReq.headers["content-type"];
-    console.log("🟡 [API Gateway] Content-Type in decorator:", contentType);
-
+    console.log("🟡 [API Gateway] Content-Type:", contentType);
+    
     if (contentType && contentType.includes("multipart/form-data")) {
-      console.log(
-        "🟡 [API Gateway] Multipart request detected - passing raw stream",
-      );
-      return bodyContent;
+      console.log("🟡 [API Gateway] Multipart request - passing raw stream");
+    } else if (contentType && contentType.includes("application/json")) {
+      console.log("🟡 [API Gateway] JSON request - body will be streamed");
     }
-    if (srcReq.body && Object.keys(srcReq.body).length > 0) {
-      console.log("🟡 [API Gateway] JSON request - stringifying body");
-      return JSON.stringify(srcReq.body);
-    }
-    console.log("🟡 [API Gateway] No body content");
-    return bodyContent;
+    
+    return bodyContent;  // Pass body through as-is
   },
 
   proxyErrorHandler: (err, res, next) => {
@@ -116,6 +111,5 @@ export const restaurantProxy = proxy(RESTAURANT_SERVICE_URL, {
   },
 
   timeout: 15000,
-
-  parseReqBody: false,
+  parseReqBody: false,  // ✅ Keep as false for proper streaming
 });

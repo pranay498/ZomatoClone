@@ -1,122 +1,102 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../Context/MainContext";
-
-// npm install leaflet react-leaflet
-// npm install -D @types/leaflet
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import toast from "react-hot-toast";
+import { validateAndSaveAddress, reverseGeocodeLatLng, AddressPayload } from "../services/api";
 
-// ── Import all backend calls from api.ts ──────────────────────
-import {
-  validateAndSaveAddress,
-  savePaymentMethod,
-  reverseGeocodeLatLng,
-  type AddressPayload,
-} from "../services/api"; // ← adjust path if api.ts is elsewhere
-
-// Fix leaflet default marker icons (broken in webpack/vite)
+// ── Fix leaflet default marker icons ──────────────────────────────
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconUrl:       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl:     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
 const goldIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+  iconUrl:     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png",
+  shadowUrl:   "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize:    [25, 41], iconAnchor:  [12, 41],
+  popupAnchor: [1, -34], shadowSize:  [41, 41],
 });
 
-// ─── THEME ────────────────────────────────────────────────────
-const gold = "#d4af64";
+// ── Design tokens ──────────────────────────────────────────────────
+const gold       = "#d4af64";
 const goldBorder = "rgba(212,175,100,0.25)";
-const textMuted = "rgba(200,175,130,0.5)";
-const textBody = "rgba(200,175,130,0.7)";
-const cardBg = "linear-gradient(155deg, rgba(20,15,7,0.98) 0%, rgba(11,8,3,0.99) 100%)";
+const textMuted  = "rgba(200,175,130,0.5)";
+const textBody   = "rgba(200,175,130,0.7)";
+const cardBg     = "linear-gradient(155deg, rgba(20,15,7,0.98) 0%, rgba(11,8,3,0.99) 100%)";
 
-type PaymentMethod = "cod" | "upi" | "card";
-interface LatLng { lat: number; lng: number }
-
-// ─── MAP CLICK HANDLER ────────────────────────────────────────
-const MapClickHandler: React.FC<{ onLocationSelect: (ll: LatLng) => void }> = ({ onLocationSelect }) => {
-  useMapEvents({ click(e) { onLocationSelect({ lat: e.latlng.lat, lng: e.latlng.lng }); } });
-  return null;
+const inputStyle: React.CSSProperties = {
+  width: "100%", background: "transparent", border: "none",
+  borderBottom: `1px solid ${goldBorder}`,
+  padding: "10px 0", color: "#f0e6cc",
+  fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 300,
+  letterSpacing: "0.04em", caretColor: gold,
+  outline: "none", transition: "border-color 0.3s",
 };
 
-// ─── CSS ──────────────────────────────────────────────────────
+const labelStyle: React.CSSProperties = {
+  display: "block", fontSize: 10, letterSpacing: "0.2em",
+  textTransform: "uppercase", color: "rgba(200,175,130,0.45)",
+  marginBottom: 8, fontWeight: 500,
+};
+
+// ── CSS ────────────────────────────────────────────────────────────
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap');
   @keyframes shimmer { 0%{background-position:0% center;} 100%{background-position:200% center;} }
   @keyframes drift1  { 0%,100%{transform:translate(0,0);} 50%{transform:translate(28px,-20px);} }
   @keyframes drift2  { 0%,100%{transform:translate(0,0);} 50%{transform:translate(-22px,-26px);} }
   @keyframes spin    { to{transform:rotate(360deg);} }
-  .ap-root *:not(.leaflet-container *) { box-sizing:border-box; margin:0; padding:0; }
-  .ap-input:focus { border-bottom-color: rgba(212,175,100,0.7) !important; outline:none; }
-  .ap-input::placeholder { color:rgba(200,180,140,0.22); font-style:italic; }
-  .ap-input:-webkit-autofill { -webkit-box-shadow:0 0 0 1000px #0d0a05 inset !important; -webkit-text-fill-color:#f0e6cc !important; }
-  .payment-option:hover { border-color:rgba(212,175,100,0.5) !important; background:rgba(212,175,100,0.06) !important; }
-
-  /* ── FIX: Leaflet map MUST have explicit height ── */
-  .leaflet-container {
-    height: 320px !important;   /* ← This is the most common fix for blank maps */
-    width: 100% !important;
-    background: #0d0a05 !important;
-    font-family: 'DM Sans', sans-serif !important;
-    border-radius: 3px;
-  }
-  .leaflet-control-zoom a { background:rgba(20,15,7,0.95) !important; border-color:rgba(212,175,100,0.25) !important; color:#d4af64 !important; }
-  .leaflet-control-zoom a:hover { background:rgba(212,175,100,0.1) !important; }
-  .leaflet-control-attribution { background:rgba(9,7,5,0.8) !important; color:rgba(200,175,130,0.3) !important; font-size:9px !important; }
-  .leaflet-control-attribution a { color:rgba(212,175,100,0.4) !important; }
+  .ap-root *, .ap-root *::before, .ap-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  .ap-input:focus { border-bottom-color: rgba(212,175,100,0.7) !important; outline: none; }
+  .ap-input::placeholder { color: rgba(200,180,140,0.22); font-style: italic; }
+  .ap-input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #0d0a05 inset !important; -webkit-text-fill-color: #f0e6cc !important; }
+  .leaflet-container { background: #0d0a05 !important; font-family: 'DM Sans', sans-serif !important; border-radius: 3px; }
+  .leaflet-control-zoom a { background: rgba(20,15,7,0.95) !important; border-color: rgba(212,175,100,0.25) !important; color: #d4af64 !important; }
+  .leaflet-control-zoom a:hover { background: rgba(212,175,100,0.1) !important; }
+  .leaflet-control-attribution { background: rgba(9,7,5,0.8) !important; color: rgba(200,175,130,0.3) !important; font-size: 9px !important; }
+  .leaflet-control-attribution a { color: rgba(212,175,100,0.4) !important; }
 `;
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "transparent",
-  border: "none",
-  borderBottom: `1px solid ${goldBorder}`,
-  padding: "10px 0",
-  color: "#f0e6cc",
-  fontFamily: "'DM Sans', sans-serif",
-  fontSize: 14,
-  fontWeight: 300,
-  letterSpacing: "0.04em",
-  caretColor: gold,
-  outline: "none",
-  transition: "border-color 0.3s",
+// ── Types ──────────────────────────────────────────────────────────
+interface LatLng { lat: number; lng: number; }
+
+// ── Map helpers ────────────────────────────────────────────────────
+const MapClickHandler: React.FC<{ onSelect: (ll: LatLng) => void }> = ({ onSelect }) => {
+  useMapEvents({ click(e) { onSelect({ lat: e.latlng.lat, lng: e.latlng.lng }); } });
+  return null;
 };
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 10,
-  letterSpacing: "0.2em",
-  textTransform: "uppercase",
-  color: "rgba(200,175,130,0.45)",
-  marginBottom: 8,
-  fontWeight: 500,
+const MapCenterUpdater: React.FC<{ center: LatLng }> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => { map.setView([center.lat, center.lng], map.getZoom()); }, [center]);
+  return null;
 };
 
-// ─── SUB-COMPONENTS ───────────────────────────────────────────
-const CornerBrackets = () => (
+// ── Corner brackets ────────────────────────────────────────────────
+const Brackets = () => (
   <>
     {[
-      { top: 0, left: 0, borderTop: `1px solid ${goldBorder}`, borderLeft: `1px solid ${goldBorder}` },
-      { top: 0, right: 0, borderTop: `1px solid ${goldBorder}`, borderRight: `1px solid ${goldBorder}` },
-      { bottom: 0, left: 0, borderBottom: `1px solid ${goldBorder}`, borderLeft: `1px solid ${goldBorder}` },
-      { bottom: 0, right: 0, borderBottom: `1px solid ${goldBorder}`, borderRight: `1px solid ${goldBorder}` },
-    ].map((s, i) => <div key={i} style={{ position: "absolute", width: 20, height: 20, zIndex: 2, ...s }} />)}
+      { top: 0,    left: 0,  borderTop:    `1px solid ${goldBorder}`, borderLeft:   `1px solid ${goldBorder}` },
+      { top: 0,    right: 0, borderTop:    `1px solid ${goldBorder}`, borderRight:  `1px solid ${goldBorder}` },
+      { bottom: 0, left: 0,  borderBottom: `1px solid ${goldBorder}`, borderLeft:   `1px solid ${goldBorder}` },
+      { bottom: 0, right: 0, borderBottom: `1px solid ${goldBorder}`, borderRight:  `1px solid ${goldBorder}` },
+    ].map((s, i) => (
+      <div key={i} style={{ position: "absolute", width: 20, height: 20, ...s, zIndex: 2 }} />
+    ))}
   </>
 );
 
-const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; step: number }> = ({ icon, title, step }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(212,175,100,0.08)", border: `1px solid ${goldBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: gold, fontWeight: 600, fontFamily: "'Playfair Display', serif" }}>{step}</div>
+// ── Section header ─────────────────────────────────────────────────
+const SectionHeader: React.FC<{ step: number; title: string; icon: React.ReactNode }> = ({ step, title, icon }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(212,175,100,0.08)", border: `1px solid ${goldBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: gold, fontWeight: 600, fontFamily: "'Playfair Display', serif", flexShrink: 0 }}>
+      {step}
+    </div>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ color: gold }}>{icon}</span>
       <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 500, color: "#f0e6cc" }}>{title}</h3>
@@ -125,237 +105,207 @@ const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; step: numb
   </div>
 );
 
-// ─── FIELD COMPONENT (reusable) ───────────────────────────────
-const Field: React.FC<{
-  label: string;
-  required?: boolean;
-  loading?: boolean;
-  children: React.ReactNode;
-}> = ({ label, required, loading, children }) => (
-  <div>
-    <label style={labelStyle}>
-      {label}{required && <span style={{ color: gold }}> *</span>}
-      {loading && <span style={{ marginLeft: 8, color: "rgba(212,175,100,0.45)", fontSize: 9 }}>● fetching…</span>}
-    </label>
-    {children}
-  </div>
+// ── Spinner ────────────────────────────────────────────────────────
+const Spin = ({ size = 14 }: { size?: number }) => (
+  <svg style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" />
+    <path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+  </svg>
 );
 
-// ─── MAIN PAGE ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+//  MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════════
 const AddressPaymentPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { location } = useApp();
-
-  const [ready, setReady] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-
-  // ── Address fields (expanded) ──
-  const [addressLine1, setAddressLine1] = useState(""); // e.g. "House 12, Lane 5"
-  const [addressLine2, setAddressLine2] = useState(""); 
-  const [landmark, setLandmark] = useState(""); // e.g. "Near Metro Station"
-  const [city, setCity] = useState(""); // e.g. "Meerut"
-  const [state, setState] = useState(""); // e.g. "Uttar Pradesh"
-  const [pincode, setPincode] = useState(""); // e.g. "250001"
-  const [addressType, setAddressType] = useState<"home" | "work" | "other">("home");
-  const [phoneNumber, setPhoneNumber] = useState(""); // ← NEW: For delivery contact
-
-  // ── Payment ──
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
-
-  // ── Map ──
-  const [markerPos, setMarkerPos] = useState<LatLng | null>(null);
-  const [mapCenter, setMapCenter] = useState<LatLng>({ lat: 28.9845, lng: 77.7064 }); // Meerut default
-  const [reverseLoading, setReverseLoading] = useState(false);
-  const [locating, setLocating] = useState(false);
+  const navigate        = useNavigate();
+  const { location, city } = useApp();
 
   // ── UI state ──
-  const [placing, setPlacing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [ready, setReady]         = useState(false);
+  const [mapReady, setMapReady]   = useState(false);
+  const [locating, setLocating]   = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // ── On mount: load saved session data or pre-fill from location context ──
+  // ── Map state ──
+  const [markerPos, setMarkerPos] = useState<LatLng | null>(null);
+  const [mapCenter, setMapCenter] = useState<LatLng>({ lat: 28.6139, lng: 77.2090 });
+
+  // ── Form state ──
+  const [form, setForm] = useState<{
+    fullAddress:  string;
+    addressLine2: string;
+    landmark:     string;
+    city:         string;
+    state:        string;
+    pincode:      string;
+    phoneNumber:  string;
+    addressType:  "home" | "work" | "other";
+  }>({
+    fullAddress:  "",
+    addressLine2: "",
+    landmark:     "",
+    city:         city?.name  || "",
+    state:        city?.state || "",
+    pincode:      "",
+    phoneNumber:  "",
+    addressType:  "home",
+  });
+
+  // ── Error state ──
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
+
+  // ── Init: pre-fill from context location ──
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem("checkoutAddressPayment");
-      if (saved) {
-        const p = JSON.parse(saved);
-        setAddressLine1(p.addressLine1 ?? "");
-        setAddressLine2(p.addressLine2 ?? "");
-        setLandmark(p.landmark ?? "");
-        setCity(p.city ?? "");
-        setState(p.state ?? "");
-        setPincode(p.pincode ?? "");
-        setAddressType(p.addressType ?? "home");
-        setPaymentMethod(p.paymentMethod ?? "cod");
-        setPhoneNumber(p.phoneNumber ?? ""); // ← NEW: Restore phone
-        if (p.lat && p.lng) {
-          const pos = { lat: p.lat, lng: p.lng };
-          setMarkerPos(pos);
-          setMapCenter(pos);
-        }
-      } else if (location?.latitude && location?.longitude) {
-        const pos = { lat: location.latitude, lng: location.longitude };
-        setMarkerPos(pos);
-        setMapCenter(pos);
-        if (location.formattedAddress) setAddressLine1(location.formattedAddress);
+    if (location?.latitude && location?.longitude) {
+      const pos = { lat: location.latitude, lng: location.longitude };
+      setMarkerPos(pos);
+      setMapCenter(pos);
+      if (location.formattedAddress) {
+        setForm(p => ({ ...p, fullAddress: location.formattedAddress! }));
       }
-    } catch (e) { console.error(e); }
-
+    }
+    if (city) {
+      setForm(p => ({ ...p, city: city.name || "", state: city.state || "" }));
+    }
     setTimeout(() => setReady(true), 80);
+    setTimeout(() => setMapReady(true), 200);
+  }, []);
 
-    setTimeout(() => setMapReady(true), 300);
-  }, [location]);
-
-  
-  const doReverseGeocode = useCallback(async (lat: number, lng: number) => {
-    setReverseLoading(true);
+  // ── Reverse geocode ──
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    setGeocoding(true);
     try {
-      const result = await reverseGeocodeLatLng(lat, lng); 
-      if (result.displayName) setAddressLine1(result.displayName);
-      if (result.city) setCity(result.city);
-      if (result.state) setState(result.state);
-      if (result.pincode) setPincode(result.pincode);
+      const result = await reverseGeocodeLatLng(lat, lng);
+      setForm(p => ({
+        ...p,
+        fullAddress: result.displayName || p.fullAddress,
+        city:        result.city        || p.city,
+        state:       result.state       || p.state,
+        pincode:     result.pincode     || p.pincode,
+      }));
     } catch (e) {
-      console.error("Reverse geocode error:", e);
+      console.error("Reverse geocode failed:", e);
     } finally {
-      setReverseLoading(false);
+      setGeocoding(false);
     }
   }, []);
 
-  
-  const handleMapClick = useCallback((latlng: LatLng) => {
-    setMarkerPos(latlng);
-    doReverseGeocode(latlng.lat, latlng.lng);
-  }, [doReverseGeocode]);
+  // ── Map pin ──
+  const handleMapClick = useCallback((ll: LatLng) => {
+    setMarkerPos(ll);
+    reverseGeocode(ll.lat, ll.lng);
+  }, [reverseGeocode]);
 
-  // ── GPS "Use my location" ──
+  // ── Locate me button ──
   const handleLocateMe = () => {
-    if (!navigator.geolocation) { alert("Geolocation not supported"); return; }
+    if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setMarkerPos(latlng);
-        setMapCenter(latlng);
-        await doReverseGeocode(latlng.lat, latlng.lng);
+      async ({ coords }) => {
+        const ll = { lat: coords.latitude, lng: coords.longitude };
+        setMarkerPos(ll);
+        setMapCenter(ll);
+        await reverseGeocode(ll.lat, ll.lng);
         setLocating(false);
       },
-      (err) => {
-        console.error(err);
-        setLocating(false);
-        alert("Could not get location. Please pin manually on the map.");
-      },
+      () => { setLocating(false); toast.error("Could not get location — pin manually on map"); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // ── Continue → calls backend via api.ts ──────────────────────
-  //
-  //  HOW IT CONNECTS TO BACKEND:
-  //  1. Calls validateAndSaveAddress() from api.ts
-  //  2. api.ts sends POST to BASE_URL + "/api/v1/user/address/validate"
-  //  3. Then calls savePaymentMethod() from api.ts
-  //  4. api.ts sends POST to BASE_URL + "/api/v1/checkout/payment/select"
-  //  5. On success, saves to sessionStorage and navigates to /checkout
-  //
-  const handleContinue = async () => {
-    setError(null);
-    if (!addressLine1.trim()) { setError("Please enter or pin your delivery address"); return; }
-    if (!city.trim()) { setError("Please enter your city"); return; }
-    if (!state.trim()) { setError("Please enter your state"); return; }
-    if (!pincode.trim()) { setError("Please enter your pincode"); return; }
-    if (!phoneNumber.trim()) { setError("Please enter your phone number"); return; }
+  const handleChange = (field: keyof typeof form, value: string) => {
+    setForm(p => ({ ...p, [field]: value }));
+    if (errors[field]) setErrors(p => ({ ...p, [field]: undefined }));
+  };
 
-    setPlacing(true);
-    let addressId: string | undefined;
+  // ── Validate form ──
+  const validate = (): boolean => {
+    const e: Partial<Record<keyof typeof form, string>> = {};
+    if (!form.fullAddress.trim()) e.fullAddress  = "Full address is required";
+    if (!form.city.trim())        e.city         = "City is required";
+    if (!form.state.trim())       e.state        = "State is required";
+    if (!form.pincode.trim())     e.pincode      = "Pincode is required";
+    if (!/^\d{6}$/.test(form.pincode)) e.pincode = "Enter a valid 6-digit pincode";
+    if (!form.phoneNumber.trim()) e.phoneNumber  = "Phone number is required";
+    if (!/^[6-9]\d{9}$/.test(form.phoneNumber)) e.phoneNumber = "Enter a valid 10-digit Indian number";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  // ── Submit ─────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!validate()) {
+      toast.error("Please fix the errors above");
+      return;
+    }
+
+    const payload: AddressPayload = {
+      fullAddress:  form.fullAddress,
+      addressLine2: form.addressLine2 || undefined,
+      landmark:     form.landmark     || undefined,
+      city:         form.city,
+      state:        form.state,
+      pincode:      form.pincode,
+      addressType:  form.addressType,
+      phoneNumber:  form.phoneNumber,
+      coordinates:  markerPos ?? null,
+    };
+
     try {
-      // ── Step 1: Save address to backend ──
-      const addressPayload: AddressPayload = {
-        fullAddress: addressLine1,
-        addressLine2,
-        landmark,
-        city,
-        state,
-        pincode,
-        addressType,
-        coordinates: markerPos ?? null,
-      };
-      console.log("📍 [AddressPayment] Saving address...", addressPayload);
-      const addrRes = await validateAndSaveAddress(addressPayload);
-      console.log("📍 [AddressPayment] Address response:", addrRes);
-      
-      if (!addrRes.success) {
-        setError(addrRes.message ?? "Address validation failed");
-        setPlacing(false);
-        return;
-      }
-      
-      // ✅ Capture addressId if save was successful
-      addressId = addrRes.addressId;
-      console.log("📍 [AddressPayment] Address saved with ID:", addressId);
+      setSubmitting(true);
 
-      // ── Step 2: Save payment method ──
-      console.log("💳 [AddressPayment] Saving payment method...");
-      const payRes = await savePaymentMethod({ paymentMethod });
-      console.log("💳 [AddressPayment] Payment response:", payRes);
-      
-      if (!payRes.success) {
-        setError(payRes.message ?? "Payment setup failed");
-        setPlacing(false);
+      // ── Call validateAndSaveAddress from api.ts ──
+      const res = await validateAndSaveAddress(payload);
+
+      if (!res.success) {
+        toast.error(res.message || "Address validation failed");
         return;
       }
 
-      // ✅ Save checkout data with addressId
-      const checkoutData = {
-        addressId, // ← Include captured addressId
-        paymentMethod,
-        addressLine1, city, state, pincode,
-        lat: markerPos?.lat, lng: markerPos?.lng,
-        checkoutToken: payRes.checkoutToken,
-        phoneNumber,
-      };
-      console.log("✅ [AddressPayment] Saving checkout data:", checkoutData);
-      sessionStorage.setItem("checkoutAddressPayment", JSON.stringify(checkoutData));
+      // ── Store addressId for checkout page ──
+      if (res.addressId) {
+        sessionStorage.setItem("addressId", res.addressId);
+      }
 
+      // ── Also store full address for order summary display ──
+      sessionStorage.setItem("deliveryAddress", JSON.stringify({
+        ...payload,
+        addressId: res.addressId,
+      }));
+
+      toast.success("Address saved!");
+
+      // ── Navigate to checkout ──
       navigate("/checkout");
+
     } catch (err: any) {
-      console.error("❌ [AddressPayment] Error:", err?.message || err);
-      console.error("❌ [AddressPayment] Response data:", err?.response?.data);
-      
-      // ── Fallback: if backend fails but address was saved, still proceed with addressId ──
-      const checkoutDataFallback: any = {
-        addressLine1, addressLine2, landmark, city, state, pincode,
-        addressType, paymentMethod,
-        lat: markerPos?.lat, lng: markerPos?.lng,
-      };
-      
-      // ✅ Include addressId in fallback if it was successfully saved
-      if (addressId) {
-        checkoutDataFallback.addressId = addressId;
-        console.log("✅ [AddressPayment] Fallback: Using saved addressId:", addressId);
-      } else {
-        console.warn("⚠️ [AddressPayment] Fallback: No addressId available");
-      }
-      
-      sessionStorage.setItem("checkoutAddressPayment", JSON.stringify(checkoutDataFallback));
-      navigate("/checkout");
+      const msg = err?.response?.data?.message || "Something went wrong. Please try again.";
+      toast.error(msg);
     } finally {
-      setPlacing(false);
+      setSubmitting(false);
     }
   };
 
-  // ─── RENDER ──────────────────────────────────────────────────
+  // ── Field error display ────────────────────────────────────────
+  const FieldError = ({ field }: { field: keyof typeof form }) =>
+    errors[field] ? (
+      <p style={{ color: "#f87171", fontSize: 10, marginTop: 4, letterSpacing: "0.08em" }}>
+        ⚠ {errors[field]}
+      </p>
+    ) : null;
+
   return (
     <>
       <style>{CSS}</style>
+
       <div className="ap-root" style={{
-        minHeight: "100vh", width: "100%",
-        backgroundColor: "#090705",
+        minHeight: "100vh", width: "100%", backgroundColor: "#090705",
         background: "radial-gradient(ellipse at 20% 10%, rgba(201,168,76,0.07) 0%, transparent 50%), radial-gradient(ellipse at 80% 90%, rgba(184,134,11,0.06) 0%, transparent 50%), #090705",
         fontFamily: "'DM Sans', system-ui, sans-serif",
-        padding: "40px 16px 100px",
-        position: "relative", overflow: "hidden",
+        padding: "40px 16px 100px", position: "relative", overflow: "hidden",
       }}>
-        {/* Ambient orbs */}
+        {/* Orbs */}
         <div style={{ position: "absolute", top: "-8%", left: "-4%", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 68%)", filter: "blur(50px)", animation: "drift1 14s ease-in-out infinite", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "-10%", right: "-6%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(184,134,11,0.09) 0%, transparent 68%)", filter: "blur(55px)", animation: "drift2 17s ease-in-out infinite", pointerEvents: "none" }} />
 
@@ -364,75 +314,66 @@ const AddressPaymentPage: React.FC = () => {
           opacity: ready ? 1 : 0, transform: ready ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 0.6s cubic-bezier(.16,1,.3,1), transform 0.6s cubic-bezier(.16,1,.3,1)",
         }}>
+
           {/* Back */}
           <button onClick={() => navigate(-1)} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 28, background: "transparent", border: "none", color: "rgba(200,175,130,0.45)", fontFamily: "'DM Sans', sans-serif", fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", cursor: "pointer", padding: 0, transition: "color 0.2s" }}
             onMouseEnter={e => (e.currentTarget.style.color = gold)}
-            onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,175,130,0.45)")}>
+            onMouseLeave={e => (e.currentTarget.style.color = "rgba(200,175,130,0.45)")}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
             Back
           </button>
 
-          {/* Page title */}
+          {/* Title */}
           <div style={{ marginBottom: 32 }}>
-            <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(26px,4vw,36px)", fontWeight: 500, background: "linear-gradient(90deg, #b8860b, #f0d070, #daa520, #c9a84c, #b8860b)", backgroundSize: "300% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "shimmer 6s linear infinite", marginBottom: 8 }}>
-              Delivery & Payment
+            <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(26px, 4vw, 36px)", fontWeight: 500, background: "linear-gradient(90deg, #b8860b, #f0d070, #daa520, #c9a84c, #b8860b)", backgroundSize: "300% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "shimmer 6s linear infinite", marginBottom: 8 }}>
+              Delivery Address
             </h1>
-            <p style={{ fontSize: 13, color: textMuted, letterSpacing: "0.04em" }}>Pin your location, fill address details, then proceed</p>
+            <p style={{ fontSize: 13, color: textMuted }}>Pin your location on the map, then confirm your details</p>
           </div>
 
-          {/* ── STEP 1: MAP ───────────────────────────────────── */}
-          <div style={{ position: "relative", marginBottom: 28 }}>
-            <CornerBrackets />
-            <div style={{ background: cardBg, border: "1px solid rgba(212,175,100,0.13)", borderRadius: 3, padding: "28px 28px", boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}>
+          {/* ── STEP 1: MAP ── */}
+          <div style={{ position: "relative", marginBottom: 24 }}>
+            <Brackets />
+            <div style={{ background: cardBg, border: "1px solid rgba(212,175,100,0.13)", borderRadius: 3, padding: "28px", boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}>
               <SectionHeader step={1} title="Pin Your Location"
-                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg>}
+                icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>}
               />
 
-              <button onClick={handleLocateMe} disabled={locating} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, padding: "9px 18px", background: "rgba(212,175,100,0.08)", border: `1px solid ${goldBorder}`, borderRadius: 2, color: gold, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", cursor: locating ? "not-allowed" : "pointer", transition: "all 0.25s" }}
-                onMouseEnter={e => !locating && (e.currentTarget.style.background = "rgba(212,175,100,0.14)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(212,175,100,0.08)")}>
-                {locating
-                  ? <><svg style={{ animation: "spin 0.8s linear infinite" }} width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" /><path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg> Locating…</>
-                  : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg> Use My Current Location</>
-                }
+              {/* Locate Me */}
+              <button onClick={handleLocateMe} disabled={locating}
+                style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "9px 18px", background: "rgba(212,175,100,0.08)", border: `1px solid ${goldBorder}`, borderRadius: 2, color: gold, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", cursor: locating ? "not-allowed" : "pointer", transition: "all 0.2s" }}
+                onMouseEnter={e => !locating && (e.currentTarget.style.background = "rgba(212,175,100,0.15)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "rgba(212,175,100,0.08)")}
+              >
+                {locating ? <Spin /> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>}
+                {locating ? "Locating…" : "Use My Current Location"}
               </button>
 
-              {/* ── MAP: rendered only when mapReady=true ── */}
-              <div style={{ borderRadius: 3, overflow: "hidden", border: `1px solid ${goldBorder}`, position: "relative", minHeight: 320 }}>
-                <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 1000, background: "rgba(9,7,5,0.85)", border: `1px solid ${goldBorder}`, borderRadius: 2, padding: "6px 12px", backdropFilter: "blur(8px)", pointerEvents: "none" }}>
-                  <span style={{ fontSize: 10, color: "rgba(212,175,100,0.6)", letterSpacing: "0.14em", textTransform: "uppercase" }}>📍 Tap map to drop pin</span>
+              {/* Map */}
+              <div style={{ borderRadius: 3, overflow: "hidden", border: `1px solid ${goldBorder}`, position: "relative" }}>
+                <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 1000, background: "rgba(9,7,5,0.85)", border: `1px solid ${goldBorder}`, borderRadius: 2, padding: "5px 12px", pointerEvents: "none" }}>
+                  <span style={{ fontSize: 10, color: "rgba(212,175,100,0.6)", letterSpacing: "0.14em", textTransform: "uppercase" }}>
+                    📍 Tap map to pin location
+                  </span>
                 </div>
 
-                {!mapReady && (
-                  <div style={{ height: 320, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(13,10,5,0.8)" }}>
-                    <svg style={{ animation: "spin 1s linear infinite" }} width="24" height="24" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke={gold} strokeWidth="2" opacity="0.2" />
-                      <path d="M12 2a10 10 0 0110 10" stroke={gold} strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                )}
-
                 {mapReady && (
-                  <MapContainer
-                    key={`${mapCenter.lat}-${mapCenter.lng}`} // ← re-mounts map when center changes
-                    center={[mapCenter.lat, mapCenter.lng]}
-                    zoom={15}
-                    style={{ height: 320, width: "100%" }}
-                    zoomControl={true}
-                  >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
-                    <MapClickHandler onLocationSelect={handleMapClick} />
+                  <MapContainer center={[mapCenter.lat, mapCenter.lng]} zoom={15} style={{ height: 300, width: "100%" }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                    <MapClickHandler onSelect={handleMapClick} />
+                    <MapCenterUpdater center={mapCenter} />
                     {markerPos && (
                       <Marker
                         position={[markerPos.lat, markerPos.lng]}
                         icon={goldIcon}
-                        draggable={true}
+                        draggable
                         eventHandlers={{
                           dragend(e) {
                             const p = e.target.getLatLng();
                             const ll = { lat: p.lat, lng: p.lng };
                             setMarkerPos(ll);
-                            doReverseGeocode(p.lat, p.lng);
+                            reverseGeocode(ll.lat, ll.lng);
                           },
                         }}
                       />
@@ -441,178 +382,124 @@ const AddressPaymentPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Coordinates pill */}
               {markerPos && (
-                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(212,175,100,0.6)", flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: textMuted }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: gold, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: textMuted, fontFamily: "monospace" }}>
                     {markerPos.lat.toFixed(6)}, {markerPos.lng.toFixed(6)}
                   </span>
-                  {reverseLoading && (
-                    <svg style={{ animation: "spin 0.8s linear infinite" }} width="12" height="12" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke={gold} strokeWidth="3" opacity="0.2" />
-                      <path d="M12 2a10 10 0 0110 10" stroke={gold} strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                  )}
+                  {geocoding && <><Spin /><span style={{ fontSize: 10, color: "rgba(212,175,100,0.4)" }}>fetching address…</span></>}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── STEP 2: ADDRESS FIELDS ────────────────────────── */}
-          <div style={{ position: "relative", marginBottom: 28 }}>
-            <CornerBrackets />
-            <div style={{ background: cardBg, border: "1px solid rgba(212,175,100,0.13)", borderRadius: 3, padding: "28px 28px", boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}>
+          {/* ── STEP 2: ADDRESS DETAILS ── */}
+          <div style={{ position: "relative", marginBottom: 24 }}>
+            <Brackets />
+            <div style={{ background: cardBg, border: "1px solid rgba(212,175,100,0.13)", borderRadius: 3, padding: "28px", boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}>
               <SectionHeader step={2} title="Confirm Address"
-                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>}
+                icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>}
               />
 
               {/* Address type tabs */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-                {(["home", "work", "other"] as const).map(type => (
-                  <button key={type} onClick={() => setAddressType(type)} style={{ padding: "7px 18px", borderRadius: 2, border: `1px solid ${addressType === type ? "rgba(212,175,100,0.6)" : goldBorder}`, background: addressType === type ? "rgba(212,175,100,0.12)" : "transparent", color: addressType === type ? gold : textMuted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: addressType === type ? 600 : 400, letterSpacing: "0.14em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.2s" }}>
-                    {type === "home" ? "🏠 " : type === "work" ? "🏢 " : "📍 "}{type}
+              <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+                {(["home", "work", "other"] as const).map(t => (
+                  <button key={t} onClick={() => handleChange("addressType", t)}
+                    style={{ padding: "7px 16px", borderRadius: 2, border: `1px solid ${form.addressType === t ? "rgba(212,175,100,0.6)" : goldBorder}`, background: form.addressType === t ? "rgba(212,175,100,0.12)" : "transparent", color: form.addressType === t ? gold : textMuted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: form.addressType === t ? 600 : 400, letterSpacing: "0.14em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.2s" }}>
+                    {t === "home" ? "🏠 " : t === "work" ? "🏢 " : "📍 "}{t}
                   </button>
                 ))}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-                {/* Address Line 1 — auto-filled from map */}
-                <Field label="Address Line 1 (House / Flat / Building)" required loading={reverseLoading}>
-                  <textarea
-                    className="ap-input"
-                    value={addressLine1}
-                    onChange={e => setAddressLine1(e.target.value)}
-                    placeholder="House No. 12, Street / Colony name…"
-                    rows={2}
-                    style={{ ...inputStyle, resize: "none" }}
-                  />
-                </Field>
+                {/* Full address */}
+                <div>
+                  <label style={labelStyle}>
+                    Full Address *
+                    {geocoding && <span style={{ marginLeft: 8, color: "rgba(212,175,100,0.4)", fontSize: 9 }}>● auto-filling from map…</span>}
+                  </label>
+                  <textarea className="ap-input" value={form.fullAddress} onChange={e => handleChange("fullAddress", e.target.value)}
+                    placeholder="House/Flat no., Street, Area…" rows={3} style={{ ...inputStyle, resize: "none" }} />
+                  <FieldError field="fullAddress" />
+                </div>
 
-                {/* Address Line 2 */}
-                <Field label="Address Line 2 (Area / Sector / Locality)">
-                  <input
-                    className="ap-input"
-                    type="text"
-                    value={addressLine2}
-                    onChange={e => setAddressLine2(e.target.value)}
-                    placeholder="Sector 14, Near Shastri Nagar…"
-                    style={inputStyle}
-                  />
-                </Field>
+                {/* Address line 2 */}
+                <div>
+                  <label style={labelStyle}>Address Line 2</label>
+                  <input className="ap-input" type="text" value={form.addressLine2} onChange={e => handleChange("addressLine2", e.target.value)}
+                    placeholder="Apartment, suite, floor (optional)" style={inputStyle} />
+                </div>
 
-                {/* Landmark */}
-                <Field label="Landmark">
-                  <input
-                    className="ap-input"
-                    type="text"
-                    value={landmark}
-                    onChange={e => setLandmark(e.target.value)}
-                    placeholder="Near Metro Station, Opposite Park…"
-                    style={inputStyle}
-                  />
-                </Field>
+                {/* Landmark + Pincode */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  <div>
+                    <label style={labelStyle}>Landmark</label>
+                    <input className="ap-input" type="text" value={form.landmark} onChange={e => handleChange("landmark", e.target.value)}
+                      placeholder="Near park, temple…" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Pincode *</label>
+                    <input className="ap-input" type="text" value={form.pincode} onChange={e => handleChange("pincode", e.target.value)}
+                      placeholder="e.g. 201016" maxLength={6} style={inputStyle} />
+                    <FieldError field="pincode" />
+                  </div>
+                </div>
 
                 {/* City + State */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                  <Field label="City" required>
-                    <input
-                      className="ap-input"
-                      type="text"
-                      value={city}
-                      onChange={e => setCity(e.target.value)}
-                      placeholder="Meerut"
-                      style={inputStyle}
-                    />
-                  </Field>
-                  <Field label="State" required>
-                    <input
-                      className="ap-input"
-                      type="text"
-                      value={state}
-                      onChange={e => setState(e.target.value)}
-                      placeholder="Uttar Pradesh"
-                      style={inputStyle}
-                    />
-                  </Field>
+                  <div>
+                    <label style={labelStyle}>City *</label>
+                    <input className="ap-input" type="text" value={form.city} onChange={e => handleChange("city", e.target.value)}
+                      placeholder="e.g. Ghaziabad" style={inputStyle} />
+                    <FieldError field="city" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>State *</label>
+                    <input className="ap-input" type="text" value={form.state} onChange={e => handleChange("state", e.target.value)}
+                      placeholder="e.g. Uttar Pradesh" style={inputStyle} />
+                    <FieldError field="state" />
+                  </div>
                 </div>
 
-                {/* Pincode */}
-                <Field label="Pincode" required>
-                  <input
-                    className="ap-input"
-                    type="text"
-                    value={pincode}
-                    onChange={e => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="e.g. 250001"
-                    maxLength={6}
-                    style={{ ...inputStyle, maxWidth: 200 }}
-                  />
-                </Field>
-
-                {/* Phone Number — NEW ← */}
-                <Field label="Phone Number for Delivery" required>
-                  <input
-                    className="ap-input"
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                    placeholder="10-digit mobile number"
-                    maxLength={10}
-                    style={{ ...inputStyle, maxWidth: 240 }}
-                  />
-                </Field>
-
+                {/* Phone */}
+                <div>
+                  <label style={labelStyle}>Phone Number *</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                    <span style={{ color: textMuted, fontSize: 14, paddingRight: 8, borderBottom: `1px solid ${goldBorder}`, paddingBottom: 10 }}>+91</span>
+                    <input className="ap-input" type="tel" value={form.phoneNumber} onChange={e => handleChange("phoneNumber", e.target.value.replace(/\D/g, ""))}
+                      placeholder="98765 43210" maxLength={10} style={{ ...inputStyle, flex: 1 }} />
+                  </div>
+                  <FieldError field="phoneNumber" />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* ── STEP 3: PAYMENT ───────────────────────────────── */}
-          <div style={{ position: "relative", marginBottom: 28 }}>
-            <CornerBrackets />
-            <div style={{ background: cardBg, border: "1px solid rgba(212,175,100,0.13)", borderRadius: 3, padding: "28px 28px", boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}>
-              <SectionHeader step={3} title="Payment Method"
-                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {([
-                  { id: "cod" as PaymentMethod, icon: "💵", label: "Cash on Delivery", desc: "Pay when your order arrives" },
-                  { id: "upi" as PaymentMethod, icon: "📱", label: "UPI", desc: "Google Pay, PhonePe, Paytm" },
-                  { id: "card" as PaymentMethod, icon: "💳", label: "Credit / Debit Card", desc: "Visa, Mastercard, RuPay" },
-                ]).map(opt => {
-                  const sel = paymentMethod === opt.id;
-                  return (
-                    <div key={opt.id} className="payment-option" onClick={() => setPaymentMethod(opt.id)} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 18px", borderRadius: 3, border: `1px solid ${sel ? "rgba(212,175,100,0.55)" : goldBorder}`, background: sel ? "rgba(212,175,100,0.08)" : "transparent", cursor: "pointer", transition: "all 0.25s" }}>
-                      <span style={{ fontSize: 22 }}>{opt.icon}</span>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ color: sel ? "#f0e6cc" : textBody, fontSize: 14, fontWeight: 500 }}>{opt.label}</p>
-                        <p style={{ color: textMuted, fontSize: 11, marginTop: 2 }}>{opt.desc}</p>
-                      </div>
-                      <div style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0, border: `2px solid ${sel ? gold : "rgba(212,175,100,0.3)"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
-                        {sel && <div style={{ width: 8, height: 8, borderRadius: "50%", background: gold }} />}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Error message */}
-          {error && (
-            <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.25)", borderRadius: 3, color: "rgba(255,150,130,0.9)", fontSize: 13, letterSpacing: "0.02em" }}>
-              ⚠ {error}
-            </div>
-          )}
-
-          {/* ── CONTINUE BUTTON ── */}
-          <button onClick={handleContinue} disabled={placing} style={{ width: "100%", padding: "16px 20px", background: placing ? "rgba(212,175,100,0.3)" : "linear-gradient(135deg, #b8860b 0%, #daa520 40%, #e8c84a 60%, #b8860b 100%)", border: "none", borderRadius: 2, color: placing ? "rgba(18,13,0,0.5)" : "#120d00", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", cursor: placing ? "not-allowed" : "pointer", transition: "all 0.35s", boxShadow: "0 4px 20px rgba(212,175,100,0.2)", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}
-            onMouseEnter={e => !placing && (e.currentTarget.style.boxShadow = "0 8px 32px rgba(212,175,100,0.38)")}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 4px 20px rgba(212,175,100,0.2)")}>
-            {placing
-              ? <><svg style={{ animation: "spin 0.8s linear infinite" }} width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" /><path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg><span>Validating…</span></>
-              : <span>Continue to Checkout →</span>
-            }
+          {/* ── SUBMIT BUTTON ── */}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            style={{
+              width: "100%", padding: "16px 20px",
+              background: submitting
+                ? "rgba(212,175,100,0.3)"
+                : "linear-gradient(135deg, #b8860b 0%, #daa520 40%, #e8c84a 60%, #b8860b 100%)",
+              border: "none", borderRadius: 2,
+              color: submitting ? "rgba(18,13,0,0.5)" : "#120d00",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700,
+              letterSpacing: "0.24em", textTransform: "uppercase",
+              cursor: submitting ? "not-allowed" : "pointer",
+              transition: "all 0.3s",
+              boxShadow: "0 4px 20px rgba(212,175,100,0.2)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            }}
+            onMouseEnter={e => !submitting && (e.currentTarget.style.boxShadow = "0 8px 32px rgba(212,175,100,0.38)")}
+            onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 4px 20px rgba(212,175,100,0.2)")}
+          >
+            {submitting ? <><Spin /><span>Saving Address…</span></> : <span>Continue to Order Summary</span>}
           </button>
 
           <p style={{ textAlign: "center", marginTop: 12, fontSize: 10, color: "rgba(200,175,130,0.2)", letterSpacing: "0.14em" }}>

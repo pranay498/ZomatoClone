@@ -109,13 +109,13 @@ const RestaurantDetail: React.FC = () => {
   const navigate = useNavigate();
 
   const [restaurant, setRestaurant] = useState<IRestaurant | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [ready, setReady]           = useState(false);
-  const [cartOpen, setCartOpen]     = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const { items, addItem, removeItem, clearCart, total, itemCount } = useCart();
 
-  const gold       = "#d4af64";
+  const gold = "#d4af64";
   const goldBorder = "rgba(212,175,100,0.25)";
 
   // ── Fetch restaurant ──
@@ -203,7 +203,7 @@ const RestaurantDetail: React.FC = () => {
           />
         </div>
 
-       
+
         {itemCount > 0 && restaurant.isOpen && (
           <button
             className="cart-fab"
@@ -239,11 +239,10 @@ const RestaurantDetail: React.FC = () => {
         onRemove={removeItem}
         onClear={clearCart}
         onCheckout={() => {
-          localStorage.setItem("checkoutCart", JSON.stringify({
-            items,
-            restaurantName: restaurant.name,
-            restaurantId: restaurant._id,
-          }));
+          sessionStorage.setItem("cart", JSON.stringify(items));
+          sessionStorage.setItem("restaurantId", restaurant._id);
+          sessionStorage.setItem("restaurantName", restaurant.name);
+
           navigate("/address-payment");
         }}
         open={cartOpen}

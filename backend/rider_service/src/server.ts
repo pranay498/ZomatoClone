@@ -2,10 +2,8 @@ import express, { Application, Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./config/db";
-import { connectRedis } from "./config/redis";
-import rabbitMQService from "./config/rabbitmq";
+import { connectRabbitMQ } from "./config/rabbitmq";
 import { errorMiddleware, AppError } from "./utils/AppError";
-import riderRoutes from "./routes/rider.routes";
 
 dotenv.config();
 
@@ -33,7 +31,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ROUTES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-app.use("/api/riders", riderRoutes);
 
 // Health check
 app.get("/health", (req: Request, res: Response) => {
@@ -63,10 +60,9 @@ const startServer = async () => {
     await connectDB();
 
     // Connect to Redis
-    await connectRedis();
 
     // Connect to RabbitMQ
-    await rabbitMQService.connect();
+    await connectRabbitMQ();
 
     // Start server
     app.listen(PORT, () => {

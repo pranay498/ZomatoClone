@@ -10,12 +10,12 @@ import Navbar from "./components/Navbar";
 import RestaurantPage from "./components/Restaurnant/Restaurantpage";
 import { useApp } from "./Context/MainContext";
 import RestaurantDetail from "./components/Home/RestaurantDetails";
-import CheckoutPage from "./pages/CheckoutPage";
 import AddressPaymentPage from "./pages/AddressPaymentPage";
+import CheckoutPage from "./pages/CheckoutPage";
 
 export default function App() {
 
-  const {user} = useApp();
+  const { user } = useApp();
 
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID as string}>
@@ -31,9 +31,10 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/select-role" element={<SelectedRole />} />
             <Route path="/restaurant" element={<RestaurantPage />} />
-            <Route path="/restaurant/:id" element={<RestaurantDetail/>} />
-            <Route path="/address-payment" element={<AddressPaymentPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/restaurant/:id" element={<RestaurantDetail />} />
+            <Route path="/address-payment" element={< AddressPaymentPage/>} />
+            <Route path="/checkout" element={<CheckoutPage/>} />
+
           </Route>
         </Routes>
       </BrowserRouter>

@@ -151,9 +151,10 @@ export const addToCart = asyncHandler(
 export const syncCart = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.userId;
-    const { items } = req.body;
+    const { items, restaurantId: clientRestaurantId, restaurantName: clientRestaurantName } = req.body;
 
     console.log("🔵 [CartController] syncCart called — writing to DB");
+    console.log("🔵 [CartController] Received restaurantId from client:", clientRestaurantId);
 
     // ── Validate payload ──
     if (!items || !Array.isArray(items)) {
@@ -189,13 +190,19 @@ export const syncCart = asyncHandler(
     const restaurant = await Restaurant.findById(firstMenuItem.restaurantId);
     if (!restaurant) return next(new AppError("Restaurant not found", 404));
 
+    // ── Use derived restaurantId (from menu item) as source of truth ──
+    const derivedRestaurantId = firstMenuItem.restaurantId.toString();
+    const derivedRestaurantName = restaurant.name;
+
+    console.log("🟢 [CartController] Derived restaurantId:", derivedRestaurantId, "restaurantName:", derivedRestaurantName);
+
     // ── Upsert cart (create or overwrite) ──
     const cart = await Cart.findOneAndUpdate(
       { userId },
       {
         userId,
-        restaurantId:   firstMenuItem.restaurantId,
-        restaurantName: restaurant.name,
+        restaurantId:   derivedRestaurantId,
+        restaurantName: derivedRestaurantName,
         items,
       },
       {
@@ -205,7 +212,7 @@ export const syncCart = asyncHandler(
       }
     );
 
-    console.log("🔵 [CartController] Cart synced to DB. Total:", cart?.totalPrice);
+    console.log("🟢 [CartController] Cart synced to DB with restaurantId:", cart?.restaurantId);
 
     res.status(200).json({
       success: true,

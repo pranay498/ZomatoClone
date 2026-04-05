@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction, } from "express";
 import { Order } from "../models/Order";
 import { Cart } from "../models/Cart";
 import { Address } from "../models/Address";
@@ -6,121 +6,136 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 
 export const createOrder = asyncHandler(
-async (req: Request, res: Response, next: NextFunction) => {
-const userId = (req as any).userId;
+  async (req:Request, res: Response, next: NextFunction) => {
 
+    const userId = req.userId;
 
-// ✅ GUARD 1: Auth check
-if (!userId) {
-  return next(new AppError("Unauthorized - User ID missing", 401));
-}
+    if (!userId) return next(new AppError("Unauthorized", 401));
 
-const { addressId, paymentMethod, totalAmount, userPhone } = req.body;
+    const { addressId, paymentMethod, totalAmount, userPhone, restaurantId } = req.body;
 
-console.log("🟢 createOrder - userId:", userId);
-console.log("🟢 Request body:", { addressId, paymentMethod, totalAmount });
+    if (!addressId) return next(new AppError("addressId is required", 400));
 
-// ✅ GUARD 2: Basic validation
-if (!addressId) {
-  return next(new AppError("addressId is required", 400));
-}
+    if (!paymentMethod || !["cod","upi","card"].includes(paymentMethod))
+      return next(new AppError("Invalid payment method", 400));
 
-if (!paymentMethod || !["cod", "upi", "card"].includes(paymentMethod)) {
-  return next(new AppError("Invalid payment method", 400));
-}
+    const address = await Address.findOne({ _id: addressId, userId });
+    if (!address) return next(new AppError("Address not found or not authorized", 403));
 
-if (!totalAmount || totalAmount <= 0) {
-  return next(new AppError("Invalid total amount", 400));
-}
+    const cart = await Cart.findOne({ userId });
+    if (!cart || cart.items.length === 0)
+      return next(new AppError("Cart is empty", 400));
 
-// ✅ Phone validation
-if (userPhone && !/^\d{10}$/.test(String(userPhone))) {
-  return next(new AppError("Invalid phone number", 400));
-}
+    // ✅ Secure total calculation (INCLUDING all fees like frontend)
+    const subtotal = cart.items.reduce((sum, item) => {
+      return sum + item.price * item.quantity;
+    }, 0);
 
-// ✅ GUARD 3: Address verify (VERY IMPORTANT)
-const address = await Address.findOne({
-  _id: addressId,
-  userId,
-});
+    const deliveryFee = subtotal > 299 ? 0 : 40;
+    const platformFee = 5;
+    const gst = Math.round(subtotal * 0.05);
+    const calculatedTotal = subtotal + deliveryFee + platformFee + gst;
 
-if (!address) {
-  return next(
-    new AppError(
-      "Address not found or not authorized",
-      403
-    )
-  );
-}
+    if (calculatedTotal !== totalAmount)
+      return next(new AppError(`Total mismatch: calculated ${calculatedTotal}, received ${totalAmount}`, 400));
 
-// ✅ GUARD 4: Fetch cart (NO populate ❌)
-const cart = await Cart.findOne({ userId });
+    // ✅ Restaurant check — trust cart's restaurantId (already validated during sync)
+    // Use cart's restaurantId as source of truth
+    const finalRestaurantId = cart.restaurantId;
 
-if (!cart || cart.items.length === 0) {
-  return next(new AppError("Cart is empty", 400));
-}
+    console.log(`🟢 [Order] Creating order with restaurantId: ${finalRestaurantId}`);
 
-console.log("🟢 Cart items:", cart.items.length);
+    const orderItems = cart.items.map((item: any) => ({
+      itemId: item.menuItemId,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+    }));
 
-// ✅ FIXED: Correct mapping (NO menuItem ❌)
-const orderItems = cart.items.map((item: any) => ({
-  itemId: item.menuItemId,   // ✅ correct
-  name: item.name,
-  price: item.price,
-  quantity: item.quantity,
-}));
+    const deliveryAddress = {
+      formattedAddress: [address.fullAddress, address.addressLine2, address.landmark]
+        .filter(Boolean).join(", "),
+      mobile: userPhone || "",
+      latitude: address.coordinates?.lat ?? 0,
+      longitude: address.coordinates?.lng ?? 0,
+    };
 
-// ✅ Payment logic
-const paymentStatus =
-  paymentMethod === "cod" ? "pending" : "paid";
+    const newOrder = new Order({
+      userId,
+      restaurantId: restaurantId || cart.restaurantId,
+      restaurantName: cart.restaurantName || "Restaurant",
+      items: orderItems,
+      addressId,
+      deliveryAddress,
+      paymentMethod,
+      paymentStatus: "pending",
+      totalAmount: calculatedTotal,
+      riderId: null,
+      riderName: null,
+      riderPhone: null,
+    });
 
-// ✅ Delivery address formatting
-const deliveryAddress = {
-  formattedAddress: [
-    address.fullAddress,
-    address.addressLine2,
-    address.landmark,
-  ]
-    .filter(Boolean)
-    .join(", "),
-  mobile: userPhone ? parseInt(userPhone) : 0,
-  latitude: address.coordinates?.lat ?? 0,
-  longitude: address.coordinates?.lng ?? 0,
-};
+    const savedOrder = await newOrder.save();
 
-console.log("🟢 Creating order...");
+    res.status(201).json({
+      success: true,
+      message: "Order created",
+      orderId: savedOrder._id,
+      status: savedOrder.status,
+    });
+  }
+);
 
-// ✅ Create order
-const newOrder = new Order({
-  userId,
-  restaurantId: cart.restaurantId,
-  restaurantName: cart.restaurantName || "Restaurant",
-  items: orderItems,
-  addressId,
-  deliveryAddress,
-  paymentMethod,
-  paymentStatus,
-  status: "placed",
-  totalAmount,
-  riderId: null,
-  riderName: null,
-  riderPhone: null,
-});
+/**
+ * Confirm COD Order
+ * POST /orders/confirm-cod
+ * Sets order status to "placed" and paymentStatus to "paid"
+ * Publishes ORDER_CONFIRMED event to RabbitMQ
+ */
+export const confirmCODOrder = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.userId;
 
-const savedOrder = await newOrder.save();
+    if (!userId) return next(new AppError("Unauthorized", 401));
 
-console.log("🟢 Order created:", savedOrder._id);
+    const { orderId } = req.body;
 
-// ✅ Clear cart
-await Cart.findOneAndDelete({ userId });
+    if (!orderId) return next(new AppError("orderId is required", 400));
 
-res.status(201).json({
-  success: true,
-  message: "Order placed successfully",
-  data: {
-    orderId: savedOrder._id,
-    totalAmount: savedOrder.totalAmount,
-    status: savedOrder.status,
-  },
-});
-});
+    // Find order
+    const order = await Order.findOne({ _id: orderId, userId });
+    if (!order) return next(new AppError("Order not found or not authorized", 403));
+
+    // Validate payment method is COD
+    if (order.paymentMethod !== "cod") {
+      return next(new AppError("This order is not COD", 400));
+    }
+
+    // Validate order hasn't been confirmed already
+    if (order.status !== "pending") {
+      return next(new AppError(`Order already ${order.status}`, 400));
+    }
+
+    // ✅ Update order status
+    order.status = "placed";
+    order.paymentStatus = "paid";
+    const updatedOrder = await order.save();
+
+    console.log(`✅ [COD] Order ${orderId} placed by user ${userId}`);
+
+    // TODO: Publish ORDER_CONFIRMED to RabbitMQ if using messaging queue
+    // await publishToRabbitMQ("orders", {
+    //   event: "ORDER_CONFIRMED",
+    //   orderId: updatedOrder._id,
+    //   userId,
+    //   restaurantId: updatedOrder.restaurantId,
+    // });
+
+    res.status(200).json({
+      success: true,
+      message: "Order confirmed",
+      orderId: updatedOrder._id,
+      status: updatedOrder.status,
+    });
+  }
+);

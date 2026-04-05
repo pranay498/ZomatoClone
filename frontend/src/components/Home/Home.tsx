@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { useApp } from "../../Context/MainContext";
 import apiClient from "../../services/apiClient";
 import { INearbyRestaurant } from "../../types";
