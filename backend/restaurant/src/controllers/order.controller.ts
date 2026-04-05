@@ -139,3 +139,48 @@ export const confirmCODOrder = asyncHandler(
     });
   }
 );
+export const fetchOrderForPayment = asyncHandler(
+  async (req: Request, res: Response) => {
+
+    // 🔐 INTERNAL SECURITY CHECK
+    const receivedKey = req.headers["x-internal-key"];
+    const expectedKey = process.env.INTERNAL_SERVICE_KEY;
+    
+    console.log("🟡 [fetchOrderForPayment] Security check:");
+    console.log("  Received x-internal-key:", receivedKey ? "present" : "missing");
+    console.log("  Expected key exists:", expectedKey ? "yes" : "no");
+    console.log("  Match:", receivedKey === expectedKey ? "✅" : "❌");
+    console.log("  All headers:", Object.keys(req.headers));
+
+    if (receivedKey !== expectedKey) {
+      console.error("❌ [fetchOrderForPayment] Forbidden - key mismatch");
+      throw new AppError("Forbidden", 403);
+    }
+
+    const { id } = req.params;
+
+    // 🔍 FIND ORDER
+    const order = await Order.findById(id);
+
+    if (!order) {
+      throw new AppError("Order not found", 404);
+    }
+
+    // ❌ Prevent duplicate payment
+    if (order.paymentStatus === "paid") {
+      throw new AppError("Order already paid", 400);
+    }
+
+    // ✅ SEND ONLY REQUIRED DATA
+    res.status(200).json({
+      success: true,
+      data: {
+        orderId: order._id,
+        amount: order.totalAmount,
+        currency: "INR",
+      },
+    });
+  }
+);
+
+
