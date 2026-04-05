@@ -30,11 +30,11 @@ export interface CreateOrderResponse {
 }
 
 export interface RazorpayOrderResponse {
-  success:   boolean;
-  orderId?:  string;  // Razorpay order_id e.g. "order_abc123"
-  amount?:   number;  // in paise
-  currency?: string;
-  message?:  string;
+  success:          boolean;
+  razorpayOrderId?: string;  // Razorpay order_id e.g. "order_abc123"
+  amount?:          number;  // in paise
+  currency?:        string;
+  message?:         string;
 }
 
 export interface VerifyPaymentResponse {
@@ -121,22 +121,23 @@ export async function getOrderStatus(orderId: string) {
 // ── PAYMENT ────────────────────────────────────────────────────────
 
 /**
- * POST /api/v1/payment/create-order
+ * POST /api/v1/checkout/razorpay/order
  * Creates a Razorpay order. Call BEFORE opening Razorpay modal.
- * Does NOT touch your MongoDB order.
+ * Frontend sends orderId + amount (already calculated with all fees).
  */
-export async function createRazorpayOrder(
-  amount: number  // in paise (₹1 = 100 paise)
-): Promise<RazorpayOrderResponse> {
-  const res = await apiClient.post("/payment/create-order", { amount });
+export async function createRazorpayOrder(payload: {
+  orderId: string;
+  amount: number;  // in rupees (₹)
+}): Promise<RazorpayOrderResponse> {
+  const res = await apiClient.post("/checkout/razorpay/order", payload);
   return res.data;
 }
 
 /**
- * POST /api/v1/payment/verify
+ * POST /api/v1/checkout/razorpay/verify
  * Verifies Razorpay HMAC signature.
  * Backend publishes PAYMENT_SUCCESS to RabbitMQ.
- * Order Service consumer sets status="placed", paymentStatus="paid".
+ * Rider Service consumer updates order status to "placed", paymentStatus to "paid".
  */
 export async function verifyRazorpayPayment(payload: {
   orderId:             string;  // YOUR MongoDB orderId
@@ -144,7 +145,7 @@ export async function verifyRazorpayPayment(payload: {
   razorpay_payment_id: string;
   razorpay_signature:  string;
 }): Promise<VerifyPaymentResponse> {
-  const res = await apiClient.post("/payment/verify", payload);
+  const res = await apiClient.post("/checkout/razorpay/verify", payload);
   return res.data;
 }
 

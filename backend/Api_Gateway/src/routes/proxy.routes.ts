@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { authProxy } from "../proxy/auth.proxy";
 import { restaurantProxy } from "../proxy/restaurant.proxy";
+import { paymentProxy } from "../proxy/payment.proxy";
 import { verifyToken } from "../middlewares/auth.middleware";
 
 const router = Router();
@@ -10,7 +11,6 @@ const router = Router();
 router.use("/auth", authProxy);
 
 // Restaurant service routes (protected)
-
 router.use("/restaurant", verifyToken, restaurantProxy);
 
 // Menu service routes (protected)
@@ -21,7 +21,17 @@ router.use("/cart", verifyToken, restaurantProxy);
 
 // Address and Checkout routes -> handled by restaurant service
 router.use("/user/address", verifyToken, restaurantProxy);
-router.use("/checkout", verifyToken, restaurantProxy);
-router.use("/orders", verifyToken, restaurantProxy);
+
+// Order routes - some need JWT (user endpoints), some need internal key (service-to-service)
+// The restaurantProxy will handle the authentication verification based on the endpoint
+// User endpoints: POST /create, /confirm-cod (need JWT via verifyToken)
+// Internal endpoints: GET /:id/payment (need x-internal-key header)
+router.use("/orders", restaurantProxy);
+
+// Payment routes -> handled by rider service (Razorpay)
+
+router.use("/checkout", verifyToken, paymentProxy);
+
+router.use("/payment", verifyToken, paymentProxy);
 
 export default router;

@@ -392,10 +392,13 @@ const CheckoutPage: React.FC = () => {
 
       setStatusMsg("Opening payment…");
 
-      // Amount in paise — include tip 
+      // Amount in rupees (will be converted to paise by backend)
       const totalWithTip = grandTotal;
-      const res = await createRazorpayOrder(totalWithTip * 100);
-      if (!res.success || !res.orderId) throw new Error(res.message || "Payment init failed");
+      const res = await createRazorpayOrder({
+        orderId: orderIdToUse,
+        amount: totalWithTip,  // in rupees, backend converts to paise
+      });
+      if (!res.success || !res.razorpayOrderId) throw new Error(res.message || "Payment init failed");
 
       await new Promise<void>((resolve) => {
         const options = {
@@ -404,7 +407,7 @@ const CheckoutPage: React.FC = () => {
           currency:    res.currency || "INR",
           name:        cart?.restaurantName || "Food Delivery",
           description: "Food Order",
-          order_id:    res.orderId,  // Razorpay's order_id
+          order_id:    res.razorpayOrderId,  // Razorpay's order_id from backend
 
           handler: async (response: {
             razorpay_payment_id: string;

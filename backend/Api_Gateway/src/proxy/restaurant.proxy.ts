@@ -43,6 +43,13 @@ export const restaurantProxy = proxy(RESTAURANT_SERVICE_URL, {
 
     proxyReqOpts.headers["x-api-gateway"] = "true";
 
+    // ✅ Forward internal service key if present (for service-to-service calls)
+    const internalKey = srcReq.headers["x-internal-key"];
+    if (internalKey) {
+      proxyReqOpts.headers["x-internal-key"] = String(internalKey);
+      console.log("🟡 [API Gateway] Forwarding x-internal-key for service-to-service call");
+    }
+
     const authHeader = srcReq.headers.authorization;
     console.log(
       "🟡 [API Gateway] Auth header:",
