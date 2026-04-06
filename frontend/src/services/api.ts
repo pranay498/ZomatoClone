@@ -129,8 +129,19 @@ export async function createRazorpayOrder(payload: {
   orderId: string;
   amount: number;  // in rupees (₹)
 }): Promise<RazorpayOrderResponse> {
-  const res = await apiClient.post("/checkout/razorpay/order", payload);
-  return res.data;
+  console.log("🔵 API: createRazorpayOrder payload:", payload);
+  try {
+    const res = await apiClient.post("/checkout/razorpay/order", payload);
+    console.log("🟢 API: createRazorpayOrder response:", res.data);
+    return res.data;
+  } catch (err: any) {
+    console.error("❌ API: createRazorpayOrder error:", {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+    });
+    throw err;
+  }
 }
 
 /**
@@ -145,8 +156,19 @@ export async function verifyRazorpayPayment(payload: {
   razorpay_payment_id: string;
   razorpay_signature:  string;
 }): Promise<VerifyPaymentResponse> {
-  const res = await apiClient.post("/checkout/razorpay/verify", payload);
-  return res.data;
+  console.log("🔵 API: verifyRazorpayPayment payload:", payload);
+  try {
+    const res = await apiClient.post("/checkout/razorpay/verify", payload);
+    console.log("🟢 API: verifyRazorpayPayment response:", res.data);
+    return res.data;
+  } catch (err: any) {
+    console.error("❌ API: verifyRazorpayPayment error:", {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+    });
+    throw err;
+  }
 }
 
 // ── CART ───────────────────────────────────────────────────────────

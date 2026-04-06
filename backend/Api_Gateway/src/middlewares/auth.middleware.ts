@@ -32,8 +32,16 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): vo
 
     // Extract user data from token and set gateway headers
     if (typeof decoded === 'object' && decoded !== null) {
-      const userId = (decoded as any).id || (decoded as any).userId;
+      const userId = (decoded as any).id || (decoded as any).userId || (decoded as any)._id;
       const userRole = (decoded as any).role;
+
+      console.log(`🟡 [Auth Middleware] Decoded JWT:`, { userId, userRole, allFields: Object.keys(decoded) });
+
+      if (!userId) {
+        console.error("❌ [Auth Middleware] No userId found in JWT payload");
+        res.status(401).json({ message: "Unauthorized. Invalid token structure." });
+        return;
+      }
 
       // Validate role
       const validRoles = ["customer", "rider", "seller"]
@@ -43,11 +51,12 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): vo
       }
 
       
-      req.headers["x-user-id"] = userId;
-      req.headers["x-user-role"] = userRole;
+      req.headers["x-user-id"] = String(userId);
+      req.headers["x-user-role"] = String(userRole || "customer");
       
   
       req.headers["x-api-gateway"] = "true";
+      console.log(`🟢 [Auth Middleware] Headers set - x-user-id: ${userId}, x-user-role: ${userRole}`);
     }
 
     next();

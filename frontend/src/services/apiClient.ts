@@ -34,12 +34,18 @@ apiClient.interceptors.response.use(
     console.error("[API] Response error:", error.config?.url, error.response?.status);
     
     // If 401, clear tokens and redirect to login
-    if (error.response?.status === 401) {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("user");
-      window.location.href = "/";
-    }
+  if (error.response?.status === 401) {
+  const errorData = error.response.data;
+
+  // ❌ ignore Razorpay type errors
+  if (errorData?.error?.code === "BAD_REQUEST_ERROR") {
+    return Promise.reject(error);
+  }
+
+  // ✅ real auth failure
+  // localStorage.removeItem("accessToken");
+  // window.location.href = "/";
+}
     return Promise.reject(error);
   }
 );

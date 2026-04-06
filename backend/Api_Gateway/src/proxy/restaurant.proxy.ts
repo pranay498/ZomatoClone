@@ -47,7 +47,16 @@ export const restaurantProxy = proxy(RESTAURANT_SERVICE_URL, {
     const internalKey = srcReq.headers["x-internal-key"];
     if (internalKey) {
       proxyReqOpts.headers["x-internal-key"] = String(internalKey);
-      console.log("🟡 [API Gateway] Forwarding x-internal-key for service-to-service call");
+      console.log("🟡 [API Gateway] Forwarding x-internal-key for service-to-service call:", internalKey);
+    } else {
+      // Check if we need to add internal key for specific endpoints
+      if (srcReq.originalUrl.includes("/orders") && srcReq.originalUrl.includes("/payment")) {
+        const gatewayInternalKey = process.env.INTERNAL_SERVICE_KEY;
+        if (gatewayInternalKey) {
+          proxyReqOpts.headers["x-internal-key"] = gatewayInternalKey;
+          console.log("🟡 [API Gateway] Added internal-service key for order payment endpoint");
+        }
+      }
     }
 
     const authHeader = srcReq.headers.authorization;

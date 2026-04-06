@@ -252,4 +252,5 @@ const RestaurantDetail: React.FC = () => {
   );
 };
 
+
 export default RestaurantDetail;

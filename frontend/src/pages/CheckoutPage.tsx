@@ -394,83 +394,117 @@ const CheckoutPage: React.FC = () => {
 
       // Amount in rupees (will be converted to paise by backend)
       const totalWithTip = grandTotal;
+      
+      console.log("🟡 [Razorpay] Creating order:", { orderId: orderIdToUse, amount: totalWithTip });
+      
       const res = await createRazorpayOrder({
         orderId: orderIdToUse,
         amount: totalWithTip,  // in rupees, backend converts to paise
       });
-      if (!res.success || !res.razorpayOrderId) throw new Error(res.message || "Payment init failed");
+      
+      console.log("🟡 [Razorpay] Create order response:", res);
+      
+      if (!res.success) {
+        console.error("❌ [Razorpay] Create failed:", res.message);
+        throw new Error(res.message || "Failed to initialize Razorpay order");
+      }
+      
+      if (!res.razorpayOrderId) {
+        console.error("❌ [Razorpay] No order ID in response:", res);
+        throw new Error("Razorpay order ID not received");
+      }
+
+      console.log("🟢 [Razorpay] Order created:", res.razorpayOrderId);
 
       await new Promise<void>((resolve) => {
-        const options = {
-          key:         import.meta.env.VITE_RAZORPAY_KEY_ID,
-          amount:      res.amount,
-          currency:    res.currency || "INR",
-          name:        cart?.restaurantName || "Food Delivery",
-          description: "Food Order",
-          order_id:    res.razorpayOrderId,  // Razorpay's order_id from backend
+        try {
+          if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
+            throw new Error("Razorpay key not configured. Set VITE_RAZORPAY_KEY_ID in .env");
+          }
 
-          handler: async (response: {
-            razorpay_payment_id: string;
-            razorpay_order_id:   string;
-            razorpay_signature:  string;
-          }) => {
-            setStatusMsg("Verifying payment…");
-            try {
-              const verifyRes = await verifyRazorpayPayment({
-                orderId: orderIdToUse,  
-                razorpay_order_id:   response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature:  response.razorpay_signature,
-              });
+          const options = {
+            key:         import.meta.env.VITE_RAZORPAY_KEY_ID,
+            amount:      res.amount,
+            currency:    res.currency || "INR",
+            name:        cart?.restaurantName || "Food Delivery",
+            description: "Food Order",
+            order_id:    res.razorpayOrderId,  // Razorpay's order_id from backend
 
-              if (!verifyRes.success) throw new Error(verifyRes.message || "Verification failed");
+            handler: async (response: {
+              razorpay_payment_id: string;
+              razorpay_order_id:   string;
+              razorpay_signature:  string;
+            }) => {
+              setStatusMsg("Verifying payment…");
+              try {
+                const verifyRes = await verifyRazorpayPayment({
+                  orderId: orderIdToUse,  
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature:  response.razorpay_signature,
+                });
 
-              // Poll until RabbitMQ consumer sets status=placed
-              setStatusMsg("Confirming with server…");
-              const placed = await pollUntilPlaced(orderIdToUse);
-              if (!placed) {
-                // Payment done but RabbitMQ timed out — still succeed
-                console.warn("⚠️ Poll timed out, payment verified — proceeding");
+                if (!verifyRes.success) throw new Error(verifyRes.message || "Verification failed");
+
+                // Poll until RabbitMQ consumer sets status=placed
+                setStatusMsg("Confirming with server…");
+                const placed = await pollUntilPlaced(orderIdToUse);
+                if (!placed) {
+                  // Payment done but RabbitMQ timed out — still succeed
+                  console.warn("⚠️ Poll timed out, payment verified — proceeding");
+                }
+
+                await clearCart();
+                sessionStorage.removeItem("cart");
+                sessionStorage.removeItem("deliveryAddress");
+                setPhase("success");
+                toast.success("Payment verified!");
+                resolve();
+
+              } catch (err: any) {
+                console.error("❌ [Razorpay] Verification error:", err);
+                toast.error(err?.response?.data?.message || "Payment verification failed");
+                setPhase("ready");
+                resolve();
               }
-
-              await clearCart();
-              sessionStorage.removeItem("cart");
-              sessionStorage.removeItem("deliveryAddress");
-              setPhase("success");
-              toast.success("Payment verified!");
-              resolve();
-
-            } catch (err: any) {
-              toast.error(err?.response?.data?.message || "Payment verification failed");
-              setPhase("ready");
-              resolve();
-            }
-          },
-
-          prefill: {
-            name:    user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "",
-            contact: address?.phoneNumber || "",
-          },
-
-          theme: { color: gold },
-
-          modal: {
-            ondismiss: () => {
-              // User closed Razorpay — NOT a failure, just let them retry
-              console.log("🟡 Razorpay dismissed");
-              setPhase("ready");
-              resolve();
             },
-          },
-        };
 
-        const rzp = new window.Razorpay(options);
-        rzp.on("payment.failed", (r: any) => {
-          toast.error("Payment failed: " + (r.error?.description || "Unknown error"));
+            prefill: {
+              name:    user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "",
+              contact: address?.phoneNumber || "",
+            },
+
+            theme: { color: "#FF6621" },
+
+            modal: {
+              ondismiss: () => {
+                // User closed Razorpay — NOT a failure, just let them retry
+                console.log("🟡 Razorpay dismissed by user");
+                setPhase("ready");
+                resolve();
+              },
+            },
+          };
+
+          console.log("🟡 [Razorpay] Opening modal with options:", options);
+          
+          const rzp = new window.Razorpay(options);
+          
+          rzp.on("payment.failed", (r: any) => {
+            console.error("❌ [Razorpay] Payment failed:", r.error);
+            toast.error("Payment failed: " + (r.error?.description || "Unknown error"));
+            setPhase("ready");
+            resolve();
+          });
+          
+          console.log("🟢 [Razorpay] Opening payment gateway...");
+          rzp.open();
+        } catch (err: any) {
+          console.error("❌ [Razorpay] Modal error:", err.message);
+          toast.error("Payment setup failed: " + err.message);
           setPhase("ready");
           resolve();
-        });
-        rzp.open();
+        }
       });
 
     } catch (err: any) {

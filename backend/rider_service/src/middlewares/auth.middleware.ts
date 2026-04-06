@@ -25,18 +25,25 @@ export const authMiddleware = (
     // ✅ Get user ID from headers set by API Gateway
     const userId = req.headers["x-user-id"] as string;
     const userRole = req.headers["x-user-role"] as string;
+    const fromGateway = req.headers["x-api-gateway"];
 
-    console.log(`🟡 [Auth] userId: ${userId}, userRole: ${userRole}`);
+    console.log(`🟡 [Auth] Checking auth headers:`, {
+      userId: userId || "missing",
+      userRole: userRole || "missing",
+      fromGateway: fromGateway || "missing",
+      allHeaders: Object.keys(req.headers).filter(k => k.startsWith('x-')),
+    });
 
     if (!userId) {
+      console.error(`❌ [Auth] No userId in headers! Available headers:`, req.headers);
       return next(new AppError("Please login to access this resource", 401));
     }
 
     // Attach to request object
     req.userId = userId;
-    req.userRole = userRole || "user";
+    req.userRole = userRole || "customer";
 
-    console.log(`🟢 [Auth] User verified: ${userId}`);
+    console.log(`🟢 [Auth] User verified: ${userId} (role: ${req.userRole})`);
     next();
   } catch (error: any) {
     return next(new AppError(error.message || "Authentication failed", 401));
