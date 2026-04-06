@@ -19,24 +19,41 @@ export const initSocket = (server: http.Server) => {
     try {
       const token = socket.handshake.auth?.token;
 
+      console.log("🔐 [Socket Auth] Validating token...");
+      console.log("🔐 Token present:", !!token);
+
       if (!token) {
-        return next(new Error("Unauthorized"));
+        console.error("❌ [Socket Auth] No token provided");
+        return next(new Error("Unauthorized: Missing token"));
       }
 
-      const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        console.error("❌ [Socket Auth] JWT_SECRET not configured");
+        return next(new Error("Server error: JWT_SECRET not configured"));
+      }
 
-      // ✅ Best practice
+      const decoded: any = jwt.verify(token, jwtSecret);
+
+      console.log("✅ [Socket Auth] Token verified!", {
+        userId: decoded.id || decoded.userId,
+        role: decoded.role,
+        restaurantId: decoded.restaurantId
+      });
+
       socket.data.user = decoded;
-
       next();
-    } catch (error) {
-      next(new Error("Authentication failed"));
+    } catch (error: any) {
+      console.error("❌ [Socket Auth] JWT verification failed:", error.message);
+      next(new Error(`Authentication failed: ${error.message}`));
     }
   });
 
   // 🔥 Connection
   io.on("connection", (socket) => {
-    console.log("🟢 User connected:", socket.id);
+    console.log("\n🟢🟢🟢 USER CONNECTED 🟢🟢🟢");
+    console.log("📱 Socket ID:", socket.id);
+    console.log("🔗 Remote IP:", socket.handshake.address);
 
     const user = socket.data.user;
     const userId = user?._id || user?.id || user?.userId;
@@ -48,9 +65,11 @@ export const initSocket = (server: http.Server) => {
     // 🔥 Join rooms
     if (userId) {
       socket.join(userId); // User-specific room
+      console.log(`📍 Joined room: ${userId}`);
     }
     if (restaurantId) {
       socket.join(`restaurant:${restaurantId}`); // Restaurant-specific room
+      console.log(`📍 Joined room: restaurant:${restaurantId}`);
     }
 
     // Example event
@@ -61,6 +80,7 @@ export const initSocket = (server: http.Server) => {
     // Disconnect
     socket.on("disconnect", () => {
       console.log("🔴 User disconnected:", socket.id);
+      console.log("\n");
     });
   });
 

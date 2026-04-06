@@ -43,10 +43,11 @@ app.get("/health", (req, res) => {
 
 // Connect to database
 
-const PORT = process.env.PORT || 8005;
+const PORT = 8004;
 
 server.listen(PORT, () => {
-    console.log(`Restaurant Service running on port ${PORT}`);
+    console.log(`🚀 RealTime Service running on port ${PORT}`);
+    console.log(`✅ Socket.io initialized and ready for WebSocket connections`);
 });
 
 export default app;

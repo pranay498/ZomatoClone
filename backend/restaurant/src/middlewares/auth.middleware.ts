@@ -7,7 +7,7 @@ declare global {
     interface Request {
       userId?: string;
       userRole?: string;
-
+      restaurantId?: string;
     }
   }
 }
@@ -35,9 +35,11 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   // Extract user identity from gateway headers
   const userId = req.headers["x-user-id"];
   const userRole = req.headers["x-user-role"];
+  const restaurantId = req.headers["x-restaurant-id"]; // 🔥 Restaurant ID for sellers
 
   console.log("🟡 [Auth Middleware] x-user-id:", userId);
   console.log("🟡 [Auth Middleware] x-user-role:", userRole);
+  console.log("🟡 [Auth Middleware] x-restaurant-id:", restaurantId);
 
   // Validate headers exist
   if (!userId || !userRole) {
@@ -53,8 +55,11 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   // Attach to request object
   req.userId = userId as string;
   req.userRole = userRole as string;
+  if (restaurantId) {
+    req.restaurantId = restaurantId as string;
+  }
   
-  console.log("🟢 [Auth Middleware] Auth passed, attaching userId:", req.userId);
+  console.log("🟢 [Auth Middleware] Auth passed, userId:", req.userId, "restaurantId:", req.restaurantId);
 
   next();
 };

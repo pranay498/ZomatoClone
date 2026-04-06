@@ -34,8 +34,9 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): vo
     if (typeof decoded === 'object' && decoded !== null) {
       const userId = (decoded as any).id || (decoded as any).userId || (decoded as any)._id;
       const userRole = (decoded as any).role;
+      const restaurantId = (decoded as any).restaurantId; // 🔥 For restaurant owners
 
-      console.log(`🟡 [Auth Middleware] Decoded JWT:`, { userId, userRole, allFields: Object.keys(decoded) });
+      console.log(`🟡 [Auth Middleware] Decoded JWT:`, { userId, userRole, restaurantId, allFields: Object.keys(decoded) });
 
       if (!userId) {
         console.error("❌ [Auth Middleware] No userId found in JWT payload");
@@ -53,10 +54,12 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): vo
       
       req.headers["x-user-id"] = String(userId);
       req.headers["x-user-role"] = String(userRole || "customer");
-      
+      if (restaurantId) {
+        req.headers["x-restaurant-id"] = String(restaurantId);
+      }
   
       req.headers["x-api-gateway"] = "true";
-      console.log(`🟢 [Auth Middleware] Headers set - x-user-id: ${userId}, x-user-role: ${userRole}`);
+      console.log(`🟢 [Auth Middleware] Headers set - userId: ${userId}, role: ${userRole}, restaurantId: ${restaurantId || "N/A"}`);
     }
 
     next();

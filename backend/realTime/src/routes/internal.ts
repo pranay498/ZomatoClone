@@ -52,7 +52,7 @@ const verifyInternalKey = (req: Request, res: Response, next: NextFunction) => {
 router.post("/notify", verifyInternalKey, (req: Request, res: Response) => {
   const {event ,room , payload} = req.body;
 
-  if (!event || !data) {
+  if (!event || !payload) {
     return res.status(400).json({
       error: "Missing required fields: event, data",
     });
@@ -64,6 +64,7 @@ router.post("/notify", verifyInternalKey, (req: Request, res: Response) => {
 
     io.to(room || "broadcast").emit(event, payload ??{});
     return res.json({ message: "Notification sent successfully" });
-
+    
+})
 
 export default router;

@@ -183,4 +183,35 @@ export const fetchOrderForPayment = asyncHandler(
   }
 );
 
+export const fetchRestaurantOrders = asyncHandler(
+  async (req: any, res: Response, next: NextFunction) => {
+    // 🔑 Auth middleware provides userId from JWT
+    const userId = req.userId;
+    const restaurantId = req.restaurantId; // From JWT restaurantId field
 
+    console.log("📋 [Fetch Orders] Request received");
+    console.log("  Owner ID:", userId);
+    console.log("  Restaurant ID:", restaurantId);
+
+    if (!userId) {
+      return next(new AppError("Unauthorized - Missing user ID", 401));
+    }
+
+    if (!restaurantId) {
+      return next(new AppError("Unauthorized - Missing restaurant ID in token", 403));
+    }
+
+    // 🔥 Fetch orders for this restaurant
+    const orders = await Order.find({ restaurantId })
+      .populate("userId", "name email phone") // Get customer details
+      .sort({ createdAt: -1 });
+
+    console.log(`✅ [Fetch Orders] Found ${orders.length} orders for restaurant ${restaurantId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Found ${orders.length} orders`,
+      data: orders,
+    });
+  }
+);

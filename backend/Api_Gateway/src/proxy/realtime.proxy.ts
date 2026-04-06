@@ -56,6 +56,7 @@ export const realtimeProxy = proxy(REALTIME_SERVICE_URL, {
         if (decoded) {
           const userId = decoded.id || decoded.userId || decoded._id;
           const userRole = decoded.role || "customer";
+          const restaurantId = decoded.restaurantId; // 🔥 Restaurant ID for sellers
 
           if (!userId) {
             console.error("❌ [RealTime Proxy] No userId found in JWT");
@@ -64,8 +65,15 @@ export const realtimeProxy = proxy(REALTIME_SERVICE_URL, {
 
           proxyReqOpts.headers["x-user-id"] = String(userId);
           proxyReqOpts.headers["x-user-role"] = String(userRole);
+          if (restaurantId) {
+            proxyReqOpts.headers["x-restaurant-id"] = String(restaurantId);
+          }
 
-          console.log("🟢 [RealTime Proxy] JWT verified ✅ User ID:", userId);
+          console.log("🟢 [RealTime Proxy] JWT verified ✅", {
+            userId,
+            userRole,
+            restaurantId: restaurantId || "N/A",
+          });
         }
       } catch (error: any) {
         console.error("❌ [RealTime Proxy] JWT verification error:", error.message);
