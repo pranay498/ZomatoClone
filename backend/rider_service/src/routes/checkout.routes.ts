@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  confirmCODOrder,
   createRazorpayOrder,
   verifyRazorpaySignatureController,
 } from "../controllers/checkout.controller";
@@ -20,5 +21,12 @@ router.post("/razorpay/order", authMiddleware, createRazorpayOrder);
  * @access  Protected (requires x-user-id header from API Gateway)
  */
 router.post("/razorpay/verify", authMiddleware, verifyRazorpaySignatureController);
+
+/**
+ * @route   POST /api/v1/checkout/confirm-cod
+ * @desc    Confirm COD order (calls restaurant service to confirm)
+ * @access  Protected (requires userId from auth middleware)
+ */
+router.post("/confirm-cod", authMiddleware, confirmCODOrder);
 
 export default router;

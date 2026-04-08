@@ -95,3 +95,22 @@ export interface ICartItem {
   quantity: number;
   restaurantId: string;
 }
+
+export interface IOrderItem {
+  itemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface IOrder {
+  _id?: string;
+  userId: string;
+  restaurantId: string;
+  items: IOrderItem[];
+  status: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  totalAmount: number;
+  createdAt: string;
+}

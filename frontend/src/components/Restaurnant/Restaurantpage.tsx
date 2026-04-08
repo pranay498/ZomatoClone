@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import apiClient from  "../../services/apiClient"
 import { RestaurantCard, RestaurantForm } from "./Restaurantcardform";
 import MenuSection from "./Menusection";
+import RestaurantOrders from "./RestaurantOrders";
 
 import { gold, textMuted, cardBg, goldBorder, GLOBAL_CSS,Spinner} from "./Restaurant.shared";
 
@@ -16,6 +17,7 @@ const RestaurantPage: React.FC = () => {
   const [loading, setLoading]         = useState(true);
   const [showForm, setShowForm]       = useState(false);
   const [ready, setReady]             = useState(false);
+  const [activeTab, setActiveTab]     = useState<"menu" | "orders">("menu");
 
   useEffect(() => {
     if (user?.role !== "seller") { setLoading(false); return; }
@@ -117,9 +119,38 @@ const RestaurantPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Menu tabs — only when viewing (not editing) */}
+          {/* Tabs — only when viewing (not editing) */}
           {restaurant && !showForm && (
-            <MenuSection restaurantId={restaurantId || restaurant._id} />
+            <div style={{ marginTop: "32px" }}>
+              <div style={{ display: "flex", borderBottom: `1px solid ${goldBorder}`, marginBottom: "20px" }}>
+                <button
+                  onClick={() => setActiveTab("menu")}
+                  style={{
+                    padding: "12px 24px", background: "none", border: "none",
+                    color: activeTab === "menu" ? gold : textMuted,
+                    borderBottom: activeTab === "menu" ? `2px solid ${gold}` : "2px solid transparent",
+                    cursor: "pointer", fontSize: "16px", fontFamily: "'Playfair Display', serif"
+                  }}>
+                  Menu
+                </button>
+                <button
+                  onClick={() => setActiveTab("orders")}
+                  style={{
+                    padding: "12px 24px", background: "none", border: "none",
+                    color: activeTab === "orders" ? gold : textMuted,
+                    borderBottom: activeTab === "orders" ? `2px solid ${gold}` : "2px solid transparent",
+                    cursor: "pointer", fontSize: "16px", fontFamily: "'Playfair Display', serif"
+                  }}>
+                  Live Orders
+                </button>
+              </div>
+
+              {activeTab === "menu" ? (
+                <MenuSection restaurantId={restaurantId || restaurant._id} />
+              ) : (
+                <RestaurantOrders restaurantId={restaurantId || restaurant._id} />
+              )}
+            </div>
           )}
         </div>
       </div>

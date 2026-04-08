@@ -127,3 +127,58 @@ export const verifyRazorpaySignatureController = asyncHandler(
     });
   }
 );
+
+export const confirmCODOrder = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.userId;
+
+    if (!userId) return next(new AppError("Unauthorized", 401));
+
+    const { orderId } = req.body;
+
+    if (!orderId) return next(new AppError("orderId is required", 400));
+
+    // 🔐 INTERNAL SECURITY CHECK - to verify order exists
+    const orderServiceUrl = `/api/v1/orders/${orderId}/payment`;
+    console.log(`🟡 [confirmCODOrder] Verifying order: ${orderServiceUrl}`);
+    
+    // Add auth token to axios
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) {
+      addAuthHeader(token);
+    }
+
+    try {
+      const response = await axiosClient.get(orderServiceUrl);
+      console.log(`🟢 [confirmCODOrder] Order verified successfully`);
+      
+      const orderData = response.data?.data;
+
+      if (!orderData) {
+        throw new AppError("Order not found", 404);
+      }
+
+      // 🔥 PUBLISH PAYMENT SUCCESS FOR COD (simplifies flow)
+      await publishPaymentSuccess({
+        orderId,
+        paymentId: `COD_${Date.now()}`,
+        provider: "cod",
+      });
+
+      console.log(`✅ [confirmCODOrder] COD order confirmed. Event published.`);
+
+      res.status(200).json({
+        success: true,
+        message: "Order confirmed successfully",
+        orderId: orderData.orderId,
+        status: "placed",
+      });
+    } catch (error: any) {
+      console.error(
+        `❌ [confirmCODOrder] Failed to confirm order:`,
+        error.response?.data || error.message
+      );
+      throw error;
+    }
+  }
+);

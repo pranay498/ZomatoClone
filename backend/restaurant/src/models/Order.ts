@@ -31,6 +31,7 @@ export interface IOrder extends Document {
 
   paymentMethod: "cod" | "upi" | "card";
   paymentId?: string; // Store Razorpay Payment ID if paid online
+  paymentProvider?: "razorpay" | "upi" | "cod"; // Payment provider
   paymentStatus: "pending" | "paid" | "failed";
 
   status:
@@ -111,6 +112,7 @@ const OrderSchema: Schema = new Schema(
       required: true,
     },
     paymentId: { type: String, default: null }, // e.g. "pay_N2abc12345"
+    paymentProvider: { type: String, enum: ["razorpay", "upi", "cod"] },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed"],

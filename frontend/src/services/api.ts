@@ -102,7 +102,7 @@ export async function createOrder(
 export async function confirmCODOrder(
   orderId: string
 ): Promise<ConfirmCODResponse> {
-  const res = await apiClient.post("/orders/confirm-cod", { orderId });
+  const res = await apiClient.post("/checkout/confirm-cod", { orderId });
   return res.data;
 }
 
@@ -116,6 +116,33 @@ export async function getOrderStatus(orderId: string) {
     success: boolean;
     order?: { status: string; paymentStatus: string };
   };
+}
+
+/**
+ * GET /api/v1/orders/seller/:restaurantId
+ * Fetch all active orders for the owner's restaurant.
+ */
+export async function fetchRestaurantOrders(restaurantId: string): Promise<{ success: boolean; data: any[] }> {
+  const res = await apiClient.get(`/orders/seller/${restaurantId}`);
+  return res.data;
+}
+
+/**
+ * GET /api/v1/orders/my
+ * Fetch all past and active orders for the currently logged in customer.
+ */
+export async function fetchMyOrders(): Promise<{ success: boolean; data: any[] }> {
+  const res = await apiClient.get(`/orders/my`);
+  return res.data;
+}
+
+/**
+ * PUT /api/v1/orders/:orderId/status
+ * Update order status inside the restaurant logic.
+ */
+export async function updateOrderStatus(orderId: string, status: string): Promise<{ success: boolean; data: any; message?: string }> {
+  const res = await apiClient.put(`/orders/${orderId}/status`, { status });
+  return res.data;
 }
 
 // ── PAYMENT ────────────────────────────────────────────────────────

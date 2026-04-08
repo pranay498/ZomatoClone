@@ -21,7 +21,7 @@ export const paymentProxy = proxy(RIDER_SERVICE_URL, {
       newPath = req.originalUrl.replace("/api/v1/checkout", "/checkout");
     }
     // Other checkout routes
-    else if (req.originalUrl.startsWith("/api/v1/checkout")) {
+    else if (req.originalUrl.startsWith("/api/v1/checkout/confirm-cod")) {
       newPath = req.originalUrl.replace("/api/v1/checkout", "/checkout");
     }
     // Payment routes fallback
@@ -67,7 +67,7 @@ export const paymentProxy = proxy(RIDER_SERVICE_URL, {
     // ✅ Extract and verify JWT from Authorization header
     const authHeader = srcReq.headers.authorization;
     const xUserId = srcReq.headers["x-user-id"];
-    
+
     // Check if x-user-id is already set by API Gateway
     if (xUserId) {
       console.log("✅ [Payment Proxy] Using x-user-id from API Gateway:", xUserId);
@@ -75,7 +75,7 @@ export const paymentProxy = proxy(RIDER_SERVICE_URL, {
       proxyReqOpts.headers["x-user-role"] = srcReq.headers["x-user-role"] || "customer";
       return proxyReqOpts;
     }
-    
+
     if (!authHeader) {
       console.error("❌ [Payment Proxy] Missing Authorization header and x-user-id");
       return proxyReqOpts;
@@ -84,28 +84,28 @@ export const paymentProxy = proxy(RIDER_SERVICE_URL, {
     } else {
       try {
         const token = authHeader.slice(7); // Remove "Bearer "
-        
+
         // ✅ Verify JWT signature with API Gateway's JWT_SECRET
         const jwtSecret = process.env.JWT_SECRET;
         if (!jwtSecret) {
           console.error("❌ [Payment Proxy] JWT_SECRET not configured in .env");
           throw new Error("JWT_SECRET not configured");
         }
-        
+
         const decoded = jwt.verify(token, jwtSecret) as any;
 
         if (decoded) {
           const userId = decoded.id || decoded.userId || decoded._id;
           const userRole = decoded.role || "customer";
-          
+
           if (!userId) {
             console.error("❌ [Payment Proxy] No userId found in JWT");
             return proxyReqOpts;
           }
-          
+
           proxyReqOpts.headers["x-user-id"] = String(userId);
           proxyReqOpts.headers["x-user-role"] = String(userRole);
-          
+
           console.log(
             "🟢 [Payment Proxy] JWT verified ✅ User ID:",
             userId
@@ -132,7 +132,7 @@ export const paymentProxy = proxy(RIDER_SERVICE_URL, {
 
   /* ERROR HANDLER */
 
-proxyErrorHandler: (err, res, next) => {
+  proxyErrorHandler: (err, res, next) => {
     console.error("🔴 [API Gateway] Proxy error:", err);
     res.status(500).json({
       message: "Restaurant service unavailable",

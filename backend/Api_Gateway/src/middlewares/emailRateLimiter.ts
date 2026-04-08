@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/AppError";
-import {redisClient} from "../config/redis"
+import { redisClient } from "../config/redis"
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_SECONDS = 15 * 60; // 15 minutes

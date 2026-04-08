@@ -57,7 +57,7 @@ const SelectRole = () => {
       setError(res.data.message || "Failed to update role");
     }
   } catch {
-    setError("Something went wrong. Please try again.");
+    setError("Somethiam seing went wrong. Please try again.");
   } finally {
     setLoading(false);
   }

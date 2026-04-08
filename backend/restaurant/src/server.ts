@@ -4,6 +4,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { connectDB } from "./config/db";
+import { connectRabbitMQ } from "./config/rabbitmq";
+import {  startPaymentConsumer } from "./config/paymentConsumer";
 import { errorHandler } from "./middlewares/error.middleware";
 import restaurantRoutes from "./routes/restaurant.routes";
 import menuRoutes from "./routes/menu.routes";
@@ -66,8 +68,40 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 8005;
 
-app.listen(PORT, () => {
-    console.log(`Restaurant Service running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    // Connect to database
+    console.log("📦 Connecting to MongoDB...");
+    await connectDB();
+    console.log("✅ MongoDB connected");
+
+    // Connect to RabbitMQ
+    console.log("🐰 Connecting to RabbitMQ...");
+    await connectRabbitMQ();
+    console.log("✅ RabbitMQ connected");
+
+    // Start consuming payment success events
+    console.log("💳 Starting payment consumer...");
+    await startPaymentConsumer();
+    console.log("✅ Payment consumer started");
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`
+╔═════════════════════════════════════════════════════════════╗
+║     🍽️  RESTAURANT SERVICE STARTED SUCCESSFULLY 🍽️         ║
+╠═════════════════════════════════════════════════════════════╣
+║  Server running on PORT: ${PORT}                             ║
+║  Environment: ${process.env.NODE_ENV || "development"}                      ║
+╚═════════════════════════════════════════════════════════════╝
+      `);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 export default app;
