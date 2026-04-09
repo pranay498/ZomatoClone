@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { IOrder } from "../types";
 import { cardBg, gold, goldBorder, textMuted } from "./Restaurnant/Restaurant.shared";
+import OrderDetailsModal from "./OrderDetailsModal";
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -39,9 +40,16 @@ interface OrderCardProps {
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   return (
-    <div style={{ background: cardBg, border: `1px solid ${goldBorder}`, borderRadius: "6px", overflow: "hidden", padding: "16px", flex: 1 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+    <>
+      <div 
+        onClick={() => setIsModalOpen(true)}
+        className="transform transition-transform duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-yellow-900/10 cursor-pointer outline-none"
+        style={{ background: cardBg, border: `1px solid ${goldBorder}`, borderRadius: "6px", overflow: "hidden", padding: "16px", flex: 1 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
         <div>
           <h3 style={{ margin: 0, color: gold, fontSize: "18px", fontFamily: "'Playfair Display', serif" }}>
             Order #{order._id?.slice(-6).toUpperCase()}
@@ -73,7 +81,10 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
         
         {onUpdateStatus && ACTIVE_STATUSES.indexOf(order.status) < ACTIVE_STATUSES.indexOf("ready_for_rider") && (
           <button 
-            onClick={() => onUpdateStatus(order._id as string, order.status)}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevents modal from opening when clicking button
+              onUpdateStatus(order._id as string, order.status);
+            }}
             style={{
               background: "linear-gradient(90deg, rgba(212,175,100,0.2), rgba(184,134,11,0.2))",
               border: `1px solid ${gold}`,
@@ -93,7 +104,15 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
           </button>
         )}
       </div>
-    </div>
+      </div>
+
+      {isModalOpen && (
+        <OrderDetailsModal 
+          order={order} 
+          onClose={() => setIsModalOpen(false)} 
+        />
+      )}
+    </>
   );
 };
 

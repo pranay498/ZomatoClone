@@ -107,10 +107,20 @@ export interface IOrder {
   _id?: string;
   userId: string;
   restaurantId: string;
+  restaurantName?: string;
+  riderName?: string;
+  riderPhone?: string;
+  deliveryAddress?: {
+    formattedAddress: string;
+    mobile: number;
+    latitude: number;
+    longitude: number;
+  };
   items: IOrderItem[];
   status: string;
   paymentMethod: string;
   paymentStatus: string;
+  paymentId?: string;
   totalAmount: number;
   createdAt: string;
 }
