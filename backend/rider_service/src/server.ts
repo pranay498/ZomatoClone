@@ -1,15 +1,16 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import connectDB from "./config/db";
+import riderRoutes from "./routes/rider.routes";
+import { errorMiddleware } from "./utils/AppError";
+import { connectDB } from "./config/db";
 import { connectRabbitMQ } from "./config/rabbitmq";
-import { errorMiddleware, AppError } from "./utils/AppError";
-import checkoutRoutes from "./routes/checkout.routes";
 
+// Environment variables
 dotenv.config();
 
 const app: Application = express();
-const PORT = process.env.PORT || 8003;
+const PORT = process.env.PORT || 8005; // 8004 is taken by RealTime Service!
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MIDDLEWARE
@@ -18,67 +19,52 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ limit: "16kb", extended: true }));
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: process.env.GATEWAY_URL || "http://localhost:5173",
     credentials: true,
   })
 );
 
-// Request logging middleware
+// Logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`📍 [Payment Service] ${req.method} ${req.path}`);
+  console.log(`📍 [Rider Service] ${req.method} ${req.path}`);
   next();
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ROUTES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-// Health check
+app.use("/api/v1/riders", riderRoutes);
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: "Payment Service is running ✅",
+    message: "Rider Service is running ✅",
     timestamp: new Date().toISOString(),
   });
 });
 
-// Checkout routes (Razorpay payment handling)
-app.use("/checkout", checkoutRoutes);
-
 // 404 handler
-app.use((req: Request, res: Response, next: NextFunction) => {
-  throw new AppError(`Route not found: ${req.originalUrl}`, 404);
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ERROR HANDLER
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// AppError Error Handler
 app.use(errorMiddleware);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// DATABASE & SERVER
+// SERVER INITIALIZATION
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const startServer = async () => {
   try {
-    // Connect to MongoDB
     await connectDB();
-
-    // Connect to Redis
-
-    // Connect to RabbitMQ
     await connectRabbitMQ();
 
-    // Start server
     app.listen(PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║     💳 PAYMENT SERVICE STARTED SUCCESSFULLY 💳          ║
+║     🛵 NEW RIDER SERVICE BOOTSTRAPPED SUCCESSFULLY 🛵   ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Server running on PORT: ${PORT}                           ║
 ║  Environment: ${process.env.NODE_ENV || "development"}                     ║
-║  MongoDB: ${process.env.MONGODB_URI?.split("/").pop() || "payment_service"}                   ║
-║  Redis: ${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}              ║
-║  RabbitMQ: ${process.env.RABBITMQ_URL?.split("@")[1] || "localhost:5672"}                   ║
 ╚═══════════════════════════════════════════════════════════╝
       `);
     });

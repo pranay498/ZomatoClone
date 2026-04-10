@@ -221,3 +221,54 @@ export async function syncCart(payload: {
  * DELETE /api/v1/cart/clear
  * Clears backend cart. Call ONLY after order confirmed (COD or payment verified).
  */
+
+// ── RIDER ──────────────────────────────────────────────────────────
+
+export interface RiderProfile {
+  _id: string;
+  userId: string;
+  picture: string;
+  phoneNumber: string;
+  addharNumber: string;
+  drivingLicenseNumber: string;
+  isVerified: boolean;
+  isAvailable: boolean;
+  location: { type: "Point"; coordinates: [number, number] };
+  lastActiveAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * GET /api/v1/riders/profile
+ * Fetch the authenticated rider's profile.
+ * Returns 404 if no profile exists yet (triggers onboarding form).
+ */
+export async function fetchRiderProfile(): Promise<{ success: boolean; rider: RiderProfile }> {
+  const res = await apiClient.get("/riders/profile");
+  return res.data;
+}
+
+/**
+ * POST /api/v1/riders/profile
+ * Create rider profile with optional picture upload (multipart/form-data).
+ * Accepts phoneNumber, addharNumber, drivingLicenseNumber, picture, longitude, latitude.
+ */
+export async function createRiderProfile(formData: FormData): Promise<{ success: boolean; message: string; rider: RiderProfile }> {
+  const res = await apiClient.post("/riders/profile", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+/**
+ * PUT /api/v1/riders/availability
+ * Toggle rider's isAvailable status. Optionally updates current location.
+ */
+export async function toggleRiderAvailability(payload: {
+  longitude?: number;
+  latitude?: number;
+}): Promise<{ success: boolean; message: string; rider: RiderProfile }> {
+  const res = await apiClient.put("/riders/availability", payload);
+  return res.data;
+}

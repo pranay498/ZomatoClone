@@ -4,7 +4,7 @@ import { Address } from "../models/Address";
 export const validateAndSaveAddress = async (req: Request, res: Response): Promise<void> => {
     try {
         const userId = (req as any).userId; // From requireAuth middleware
-        
+
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });
             return;
@@ -39,8 +39,8 @@ export const validateAndSaveAddress = async (req: Request, res: Response): Promi
 
 export const getSavedAddresses = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = (req as any).userId; 
-        
+        const userId = (req as any).userId;
+
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });
             return;

@@ -1,10 +1,10 @@
 import proxy from "express-http-proxy";
 import jwt from "jsonwebtoken";
 
-const RIDER_SERVICE_URL =
-  process.env.RIDER_SERVICE_URL || "http://localhost:8003";
+const PAYMENT_SERVICE_URL =
+  process.env.PAYMENT_SERVICE_URL || "http://localhost:8003";
 
-export const paymentProxy = proxy(RIDER_SERVICE_URL, {
+export const paymentProxy = proxy(PAYMENT_SERVICE_URL, {
   /* PATH REWRITE */
 
   proxyReqPathResolver: (req) => {
@@ -23,10 +23,6 @@ export const paymentProxy = proxy(RIDER_SERVICE_URL, {
     // Other checkout routes
     else if (req.originalUrl.startsWith("/api/v1/checkout/confirm-cod")) {
       newPath = req.originalUrl.replace("/api/v1/checkout", "/checkout");
-    }
-    // Payment routes fallback
-    else if (req.originalUrl.startsWith("/api/v1/payment")) {
-      newPath = req.originalUrl.replace("/api/v1/payment", "/payment");
     }
 
     console.log(

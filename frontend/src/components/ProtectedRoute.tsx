@@ -21,7 +21,14 @@ const ProtectedRoute = () => {
 
   // 🔥 ROLE ALREADY SELECTED → BLOCK /select-role
   if (user?.role && location.pathname === "/select-role") {
+    if (user.role === 'rider') return <Navigate to="/rider/dashboard" replace />;
+    if (user.role === 'seller') return <Navigate to="/restaurant" replace />;
     return <Navigate to="/" replace />;
+  }
+
+  // Prevent riders from browsing customer areas
+  if (user?.role === 'rider' && !location.pathname.startsWith('/rider')) {
+    return <Navigate to="/rider/dashboard" replace />;
   }
 
   return <Outlet />;

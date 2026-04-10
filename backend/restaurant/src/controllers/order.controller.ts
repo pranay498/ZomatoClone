@@ -162,6 +162,10 @@ export const fetchRestaurantOrders = asyncHandler(
 
     const { limit } = req.query;
 
+    const allOrders = await Order.find({ restaurantId });
+    console.log(`🔎 [Fetch Orders] Debug: Total orders in DB for this restaurant irrespective of payment status: ${allOrders.length}`);
+    allOrders.forEach(o => console.log(`  -> Order ${o._id}: status=${o.status}, paymentStatus=${o.paymentStatus}, method=${o.paymentMethod}`));
+
     // 🔥 Fetch orders for this restaurant
     const orders = await Order.find({ restaurantId, paymentStatus: "paid" }) // Get customer details
       .sort({ createdAt: -1 }).limit(Number(limit) || 50); // Optional limit query param
