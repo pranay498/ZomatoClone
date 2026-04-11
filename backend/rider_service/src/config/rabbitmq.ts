@@ -7,7 +7,12 @@ export const connectRabbitMQ = async () => {
 
     channel = await connection.createChannel();
 
-    console.log("🐰 RabbitMQ connected");
+    // ✅ Assert the ORDER_READY_QUEUE so rider service can consume from it
+    await channel.assertQueue(process.env.ORDER_READY_QUEUE!, {
+      durable: true,
+    });
+
+    console.log("🐰 [Rider Service] RabbitMQ connected");
 
     // handle crash
     connection.on("close", () => {

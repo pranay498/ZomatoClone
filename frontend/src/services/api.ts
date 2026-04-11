@@ -272,3 +272,37 @@ export async function toggleRiderAvailability(payload: {
   const res = await apiClient.put("/riders/availability", payload);
   return res.data;
 }
+
+/**
+ * PUT /api/v1/riders/orders/accept
+ * Rider accepts a NEW_ORDER_AVAILABLE notification.
+ */
+export async function acceptRiderOrder(orderId: string): Promise<{ success: boolean; message: string; data?: any }> {
+  const res = await apiClient.put("/riders/orders/accept", { orderId });
+  return res.data;
+}
+
+/**
+ * GET /api/v1/riders/orders/current
+ * Fetch the rider's active (non-delivered) order.
+ */
+export async function getCurrentRiderOrder(): Promise<{ success: boolean; data: any; message?: string }> {
+  try {
+    const res = await apiClient.get("/riders/orders/current");
+    return res.data;
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      return { success: true, data: null, message: "No active order" };
+    }
+    throw error;
+  }
+}
+
+/**
+ * PUT /api/v1/riders/orders/status
+ * Update order status to "picked_up" or "delivered".
+ */
+export async function updateRiderOrderStatus(orderId: string, status: "picked_up" | "delivered"): Promise<{ success: boolean; message: string; data?: any }> {
+  const res = await apiClient.put("/riders/orders/status", { orderId, status });
+  return res.data;
+}

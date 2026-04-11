@@ -17,7 +17,6 @@ import RiderDashboard from "./pages/Rider/RiderDashboard";
 
 export default function App() {
 
-  const { user } = useApp();
 
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID as string}>
@@ -34,9 +33,9 @@ export default function App() {
             <Route path="/select-role" element={<SelectedRole />} />
             <Route path="/restaurant" element={<RestaurantPage />} />
             <Route path="/restaurant/:id" element={<RestaurantDetail />} />
-            <Route path="/address-payment" element={< AddressPaymentPage/>} />
-            <Route path="/checkout" element={<CheckoutPage/>} />
-            <Route path="/orders" element={<Orders />} />   
+            <Route path="/address-payment" element={< AddressPaymentPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/orders" element={<Orders />} />
             <Route path="/rider/dashboard" element={<RiderDashboard />} />
           </Route>
         </Routes>

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction, } from "express";
+import { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import { Order } from "../models/Order";
 import { Cart } from "../models/Cart";
@@ -6,9 +6,13 @@ import { Address } from "../models/Address";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import { Restaurant } from "../models/Restaurnent";
+import { publishEvent } from "../config/order.publisher";
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CREATE ORDER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const createOrder = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-
     const userId = req.userId;
 
     if (!userId) return next(new AppError("Unauthorized", 401));
@@ -27,11 +31,7 @@ export const createOrder = asyncHandler(
     if (!cart || cart.items.length === 0)
       return next(new AppError("Cart is empty", 400));
 
-    // ✅ Secure total calculation (INCLUDING all fees like frontend)
-    const subtotal = cart.items.reduce((sum, item) => {
-      return sum + item.price * item.quantity;
-    }, 0);
-
+    const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const deliveryFee = subtotal > 299 ? 0 : 40;
     const platformFee = 5;
     const gst = Math.round(subtotal * 0.05);
@@ -40,10 +40,7 @@ export const createOrder = asyncHandler(
     if (calculatedTotal !== totalAmount)
       return next(new AppError(`Total mismatch: calculated ${calculatedTotal}, received ${totalAmount}`, 400));
 
-    // ✅ Restaurant check — trust cart's restaurantId (already validated during sync)
-    // Use cart's restaurantId as source of truth
     const finalRestaurantId = cart.restaurantId;
-
     console.log(`🟢 [Order] Creating order with restaurantId: ${finalRestaurantId}`);
 
     const orderItems = cart.items.map((item: any) => ({
@@ -87,17 +84,11 @@ export const createOrder = asyncHandler(
   }
 );
 
-/**
- * Confirm COD Order
- * POST /orders/confirm-cod
- * Sets order status to "placed" and paymentStatus to "paid"
- * Publishes ORDER_CONFIRMED event to RabbitMQ
- */
-
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FETCH ORDER FOR PAYMENT (Internal)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const fetchOrderForPayment = asyncHandler(
   async (req: Request, res: Response) => {
-
-    // 🔐 INTERNAL SECURITY CHECK
     const receivedKey = req.headers["x-internal-key"];
     const expectedKey = process.env.INTERNAL_SERVICE_KEY;
 
@@ -113,20 +104,12 @@ export const fetchOrderForPayment = asyncHandler(
     }
 
     const { id } = req.params;
-
-    // 🔍 FIND ORDER
     const order = await Order.findById(id);
 
-    if (!order) {
-      throw new AppError("Order not found", 404);
-    }
+    if (!order) throw new AppError("Order not found", 404);
 
-    // ❌ Prevent duplicate payment
-    if (order.paymentStatus === "paid") {
-      throw new AppError("Order already paid", 400);
-    }
+    if (order.paymentStatus === "paid") throw new AppError("Order already paid", 400);
 
-    // ✅ SEND ONLY REQUIRED DATA
     res.status(200).json({
       success: true,
       data: {
@@ -138,9 +121,11 @@ export const fetchOrderForPayment = asyncHandler(
   }
 );
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FETCH RESTAURANT ORDERS (Restaurant Owner)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const fetchRestaurantOrders = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
-    // 🔑 Auth middleware provides userId from JWT
     const userId = req.userId;
     const restaurantId = req.restaurantId || req.params.restaurantId;
 
@@ -148,31 +133,25 @@ export const fetchRestaurantOrders = asyncHandler(
     console.log("  Owner ID:", userId);
     console.log("  Restaurant ID:", restaurantId);
 
-    if (!userId) {
-      return next(new AppError("Unauthorized - Missing user ID", 401));
-    }
+    if (!userId) return next(new AppError("Unauthorized - Missing user ID", 401));
+    if (!restaurantId) return next(new AppError("Unauthorized - Missing restaurant ID", 403));
 
-    if (!restaurantId) {
-      return next(new AppError("Unauthorized - Missing restaurant ID", 403));
-    }
-
-    // 🔥 Verify ownership since JWT might not contain restaurantId natively yet 
     const restaurant = await Restaurant.findOne({ _id: restaurantId, ownerId: userId });
     if (!restaurant) return next(new AppError("Forbidden - You do not own this restaurant", 403));
 
     const { limit } = req.query;
 
     const allOrders = await Order.find({ restaurantId });
-    console.log(`🔎 [Fetch Orders] Debug: Total orders in DB for this restaurant irrespective of payment status: ${allOrders.length}`);
-    allOrders.forEach(o => console.log(`  -> Order ${o._id}: status=${o.status}, paymentStatus=${o.paymentStatus}, method=${o.paymentMethod}`));
+    console.log(`🔎 [Fetch Orders] Total orders (all statuses): ${allOrders.length}`);
+    allOrders.forEach(o =>
+      console.log(`  -> Order ${o._id}: status=${o.status}, paymentStatus=${o.paymentStatus}, method=${o.paymentMethod}`)
+    );
 
-    // 🔥 Fetch orders for this restaurant
-    const orders = await Order.find({ restaurantId, paymentStatus: "paid" }) // Get customer details
-      .sort({ createdAt: -1 }).limit(Number(limit) || 50); // Optional limit query param
+    const orders = await Order.find({ restaurantId, paymentStatus: "paid" })
+      .sort({ createdAt: -1 })
+      .limit(Number(limit) || 50);
 
-    console.log(`✅ [Fetch Orders] Found ${orders.length} orders for restaurant ${restaurantId}`);
-
-
+    console.log(`✅ [Fetch Orders] Found ${orders.length} paid orders for restaurant ${restaurantId}`);
 
     return res.status(200).json({
       success: true,
@@ -182,7 +161,9 @@ export const fetchRestaurantOrders = asyncHandler(
   }
 );
 
-
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// UPDATE ORDER STATUS (Restaurant Owner)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const updateOrderStatus = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
     const userId = req.userId;
@@ -193,72 +174,87 @@ export const updateOrderStatus = asyncHandler(
     console.log("  Owner ID:", userId);
     console.log("  Order ID:", orderId);
 
-    if (!userId) {
-      return next(new AppError("Unauthorized - Missing user ID", 401));
-    }
+    if (!userId) return next(new AppError("Unauthorized - Missing user ID", 401));
+    if (!orderId || !status) return next(new AppError("orderId and status are required", 400));
 
-    if (!orderId || !status) {
-      return next(new AppError("orderId and status are required", 400));
-    }
-
-    // Validate status value
-    const validStatuses = ["accepted", "preparing", "ready_for_rider", "rider_assigned", "picked_up", "delivered"];
-    if (!validStatuses.includes(status)) {
+    const validStatuses = ["accepted", "preparing", "ready_for_rider"];
+    if (!validStatuses.includes(status))
       return next(new AppError("Invalid status value", 400));
-    }
 
-    // 🔥 Find order
     const order = await Order.findOne({ _id: orderId });
-    if (!order) {
-      return next(new AppError("Order not found", 404));
-    }
+    if (!order) return next(new AppError("Order not found", 404));
 
-    // Verify ownership
     const restaurant = await Restaurant.findOne({ _id: order.restaurantId, ownerId: userId });
-    if (!restaurant) {
-      return next(new AppError("Unauthorized - You don't own this order's restaurant", 403));
-    }
+    if (!restaurant) return next(new AppError("Unauthorized - You don't own this order's restaurant", 403));
 
     const restaurantId = restaurant._id;
 
-    // Validate payment
-    if (order.paymentStatus !== "paid") {
+    if (order.paymentStatus !== "paid")
       return next(new AppError("Cannot update unpaid order", 400));
-    }
 
-    // ✅ Update status
     order.status = status;
     const updatedOrder = await order.save();
 
-    console.log(`✅ [Update Order Status] Order ${orderId} status updated to ${status}`);
+    console.log(`✅ [Update Order Status] Order ${orderId} updated to ${status}`);
 
-    // 📡 Emit real-time event to RealTime service
-    try {
-      await axios.post(
-        `${process.env.REALTIME_SERVICE_URL}/internal/notify`,
-        {
-          event: "ORDER_STATUS_UPDATED",
-          room: `restaurant:${restaurantId}`,
-          payload: {
-            orderId: updatedOrder._id,
-            status: updatedOrder.status,
-            restaurantId: restaurantId,
-            updatedAt: updatedOrder.updatedAt,
-          },
-        },
-        {
-          headers: {
-            "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
-            "Content-Type": "application/json",
-          },
+    // 📡 Real-time events to both Restaurant and Customer
+    const notifyParties = async () => {
+      const notifications = [
+        { room: `restaurant:${restaurantId}`, label: "Restaurant" },
+        { room: updatedOrder.userId.toString(), label: "Customer" }
+      ];
+
+      for (const party of notifications) {
+        try {
+          await axios.post(
+            `${process.env.REALTIME_SERVICE_URL}/internal/notify`,
+            {
+              event: "ORDER_STATUS_UPDATED",
+              room: party.room,
+              payload: {
+                orderId: updatedOrder._id,
+                status: updatedOrder.status,
+                restaurantId,
+                updatedAt: updatedOrder.updatedAt,
+              },
+            },
+            {
+              headers: {
+                "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          console.log(`📡 [Update Order Status] ${party.label} notified — ${status}`);
+        } catch (error: any) {
+          console.error(`❌ [Update Order Status] Failed to notify ${party.label}:`, error.message);
         }
-      );
-      console.log(`📡 [Update Order Status] Real-time event sent to restaurant`);
-    } catch (error: any) {
-      console.error(
-        `❌ [Update Order Status] Failed to emit event:`,
-        error.message
-      );
+      }
+    };
+
+    notifyParties();
+
+    // 🚀 Publish to RabbitMQ → Rider Service when order is ready for pickup
+    if (status === "ready_for_rider") {
+      try {
+        await publishEvent("ORDER_READY", {
+          orderId: updatedOrder._id.toString(),
+          restaurantId: updatedOrder.restaurantId?.toString() || "",
+          restaurantName: restaurant.name || "Restaurant",
+          restaurantLocation: restaurant.autoLocation, // 📍 Added restaurant location for rider search
+          deliveryAddress: updatedOrder.deliveryAddress,
+          totalAmount: updatedOrder.totalAmount,
+          items: updatedOrder.items.map((item: any) => ({
+            itemId: item.itemId.toString(),
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+        });
+        console.log(`🚀 [Update Order Status] ORDER_READY published to RabbitMQ`);
+      } catch (error: any) {
+        console.error(`❌ [Update Order Status] Failed to publish ORDER_READY:`, error.message);
+      }
     }
 
     return res.status(200).json({
@@ -269,13 +265,14 @@ export const updateOrderStatus = asyncHandler(
   }
 );
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// GET MY ORDERS (Customer)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const getMyOrders = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
     const userId = req.userId;
 
-    if (!userId) {
-      return next(new AppError("Unauthorized - Missing user ID", 401));
-    }
+    if (!userId) return next(new AppError("Unauthorized - Missing user ID", 401));
 
     const orders = await Order.find({ userId, paymentStatus: "paid" }).sort({ createdAt: -1 });
 
@@ -286,28 +283,23 @@ export const getMyOrders = asyncHandler(
   }
 );
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FETCH SINGLE ORDER (Customer)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const fetchSingleOrder = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
     const userId = req.userId;
     const { orderId } = req.params;
 
-    if (!userId) {
-      return next(new AppError("Unauthorized - Missing user ID", 401));
-    }
-
-    if (!orderId) {
-      return next(new AppError("orderId is required", 400));
-    }
+    if (!userId) return next(new AppError("Unauthorized - Missing user ID", 401));
+    if (!orderId) return next(new AppError("orderId is required", 400));
 
     const order = await Order.findOne({ _id: orderId, userId });
 
-    if (!order) {
-      return next(new AppError("Order not found or not authorized", 404));
-    }
+    if (!order) return next(new AppError("Order not found or not authorized", 404));
 
-    if (order.userId.toString() !== userId) {
+    if (order.userId.toString() !== userId)
       return next(new AppError("Unauthorized - You can only access your own orders", 403));
-    }
 
     return res.status(200).json({
       success: true,
@@ -316,3 +308,225 @@ export const fetchSingleOrder = asyncHandler(
   }
 );
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ASSIGN RIDER TO ORDER (Internal — called by Rider Service)
+// POST /orders/assign-rider
+// Headers: x-internal-key
+// Body: { orderId, riderId, riderName, riderPhone }
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export const assignRiderToOrder = asyncHandler(
+  async (req: any, res: Response, next: NextFunction) => {
+
+    // 🔐 Internal service key check
+    const receivedKey = req.headers["x-internal-key"];
+    const expectedKey = process.env.INTERNAL_SERVICE_KEY;
+
+    console.log("🟡 [assignRiderToOrder] Security check:");
+    console.log("  Received x-internal-key:", receivedKey ? "present" : "missing");
+    console.log("  Match:", receivedKey === expectedKey ? "✅" : "❌");
+
+    if (receivedKey !== expectedKey) {
+      console.error("❌ [assignRiderToOrder] Forbidden - key mismatch");
+      throw new AppError("Forbidden", 403);
+    }
+
+    const { orderId, riderId, riderName, riderPhone } = req.body;
+
+    if (!orderId || !riderId || !riderName || !riderPhone) {
+      return next(new AppError("orderId, riderId, riderName and riderPhone are required", 400));
+    }
+
+    // 🔍 Pre-flight checks
+    const order = await Order.findById(orderId);
+    if (!order) throw new AppError("Order not found", 404);
+
+    if (order.riderId) throw new AppError("A rider is already assigned to this order", 400);
+
+    if (order.status !== "ready_for_rider") {
+      throw new AppError(
+        `Cannot assign rider — order status is "${order.status}", expected "ready_for_rider"`,
+        400
+      );
+    }
+
+    // ==========================================
+    // 🚨 NEW ADDITION: Block multiple active orders for a single rider
+    // ==========================================
+    const activeRiderOrder = await Order.findOne({
+      riderId,
+      status: { $in: ["rider_assigned", "picked_up"] }
+    });
+
+    if (activeRiderOrder) {
+      throw new AppError("This rider is currently on an active delivery. Cannot assign.", 409);
+    }
+
+    // ✅ Atomic update — guards against race condition (two riders accepting at the same time)
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: orderId, status: "ready_for_rider", riderId: null },
+      {
+        $set: {
+          riderId,
+          riderName,
+          riderPhone,
+          status: "rider_assigned",
+        },
+      },
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      // Another rider grabbed it between the check and update
+      throw new AppError("Order was just assigned to another rider", 409);
+    }
+
+    console.log(`✅ [assignRiderToOrder] Rider ${riderId} assigned to order ${orderId}`);
+
+    // 📡 Notify BOTH Customer and Restaurant via Realtime Service
+    const notifyPartiesAssign = async () => {
+      const notifications = [
+        { room: updatedOrder.userId.toString(), label: "Customer" },
+        { room: `restaurant:${updatedOrder.restaurantId}`, label: "Restaurant" }
+      ];
+
+      for (const party of notifications) {
+        try {
+          await axios.post(
+            `${process.env.REALTIME_SERVICE_URL}/internal/notify`,
+            {
+              event: "ORDER_STATUS_UPDATED",
+              room: party.room,
+              payload: {
+                orderId: updatedOrder._id,
+                status: updatedOrder.status,
+                riderId,
+                riderName,
+                riderPhone,
+                updatedAt: updatedOrder.updatedAt,
+              },
+            },
+            {
+              headers: {
+                "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          console.log(`📡 [assignRiderToOrder] ${party.label} notified via Socket.IO`);
+        } catch (error: any) {
+          console.error(`❌ [assignRiderToOrder] Failed to notify ${party.label}:`, error.message);
+        }
+      }
+    };
+
+    notifyPartiesAssign();
+
+    return res.status(200).json({
+      success: true,
+      message: "Rider assigned to order",
+      data: updatedOrder,
+    });
+  }
+);
+
+export const getCurrentOrderForRider = asyncHandler(
+  async (req: any, res: Response, next: NextFunction) => {
+
+
+    const riderId = req.headers["x-user-id"] || req.userId;
+
+    if (!riderId) return next(new AppError("Unauthorized - Missing user ID", 401));
+
+    const order = await Order.findOne({
+      riderId,
+      status: { $ne: "delivered" },
+    }).populate("restaurantId");
+
+    // Order Service expected 404 behavior if no order is found
+    if (!order) return next(new AppError("No current order found", 404));
+
+    return res.status(200).json({
+      success: true,
+      data: order,
+    });
+  }
+);
+
+export const updateOrderStatusRider = asyncHandler(
+  async (req: any, res: Response, next: NextFunction) => {
+
+    // 🔐 Internal service key check
+
+    const riderId = req.userId;
+    const { orderId, status } = req.body;
+
+    console.log("🚴 [Rider Status Update] Request received");
+    console.log("  Rider ID:", riderId);
+    console.log("  Order ID:", orderId);
+    console.log("  New Status:", status);
+
+    if (!riderId) return next(new AppError("Unauthorized - Missing user ID", 401));
+    if (!orderId || !status) return next(new AppError("orderId and status are required", 400));
+
+    // ✅ Only allow rider-specific statuses
+    const validStatuses = ["picked_up", "delivered"];
+    if (!validStatuses.includes(status))
+      return next(new AppError(`Invalid status. Allowed: ${validStatuses.join(", ")}`, 400));
+
+    const order = await Order.findById(orderId);
+    if (!order) return next(new AppError("Order not found", 404));
+
+    // 🔐 Verify the rider owns this order
+    if (!order.riderId || order.riderId.toString() !== riderId)
+      return next(new AppError("Unauthorized - This order is not assigned to you", 403));
+
+    order.status = status;
+    const updatedOrder = await order.save();
+
+    console.log(`✅ [Rider Status Update] Order ${orderId} updated to ${status}`);
+
+    // 📡 Notify the customer via Realtime Service
+    // 📡 Notify BOTH Customer and Restaurant via Realtime Service
+    const notifyPartiesRiderUpdate = async () => {
+      const notifications = [
+        { room: updatedOrder.userId.toString(), label: "Customer" },
+        { room: `restaurant:${updatedOrder.restaurantId}`, label: "Restaurant" }
+      ];
+
+      for (const party of notifications) {
+        try {
+          await axios.post(
+            `${process.env.REALTIME_SERVICE_URL}/internal/notify`,
+            {
+              event: "ORDER_STATUS_UPDATED",
+              room: party.room,
+              payload: {
+                orderId: updatedOrder._id,
+                status: updatedOrder.status,
+                riderId,
+                updatedAt: updatedOrder.updatedAt,
+              },
+            },
+            {
+              headers: {
+                "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          console.log(`📡 [Rider Status Update] ${party.label} notified — ${status}`);
+        } catch (error: any) {
+          console.error(`❌ [Rider Status Update] Failed to notify ${party.label}:`, error.message);
+        }
+      }
+    };
+
+    notifyPartiesRiderUpdate();
+
+    return res.status(200).json({
+      success: true,
+      message: `Order status updated to ${status}`,
+      data: updatedOrder,
+    });
+  }
+);

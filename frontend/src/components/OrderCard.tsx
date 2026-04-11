@@ -36,10 +36,10 @@ const ACTIVE_STATUSES = [
 
 interface OrderCardProps {
   order: IOrder;
-  onUpdateStatus?: (orderId: string, currentStatus: string) => void;
+  onUpdateOrder?: (orderId: string, currentStatus: string) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateOrder }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -79,11 +79,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
           Total Amount: <strong style={{ color: gold, fontSize: "16px" }}>₹{order.totalAmount}</strong>
         </span>
         
-        {onUpdateStatus && ACTIVE_STATUSES.indexOf(order.status) < ACTIVE_STATUSES.indexOf("ready_for_rider") && (
+        {onUpdateOrder && ACTIVE_STATUSES.indexOf(order.status) < ACTIVE_STATUSES.indexOf("ready_for_rider") && (
           <button 
             onClick={(e) => {
               e.stopPropagation(); // Prevents modal from opening when clicking button
-              onUpdateStatus(order._id as string, order.status);
+              onUpdateOrder(order._id as string, order.status);
             }}
             style={{
               background: "linear-gradient(90deg, rgba(212,175,100,0.2), rgba(184,134,11,0.2))",
@@ -110,6 +110,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
         <OrderDetailsModal 
           order={order} 
           onClose={() => setIsModalOpen(false)} 
+          onUpdateOrder={onUpdateOrder}
         />
       )}
     </>

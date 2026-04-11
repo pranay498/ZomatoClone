@@ -36,7 +36,7 @@ export const createRazorpayOrder = asyncHandler(
     // GET /api/v1/orders/:id/payment → routes to restaurant service
     const orderServiceUrl = `/api/v1/orders/${orderId}/payment`;
     console.log(`🟡 [createRazorpayOrder] Calling: ${orderServiceUrl}`);
-    
+
     // Add auth token to axios
     const token = req.headers.authorization?.split(" ")[1];
     if (token) {
@@ -46,7 +46,7 @@ export const createRazorpayOrder = asyncHandler(
     try {
       const response = await axiosClient.get(orderServiceUrl);
       console.log(`🟢 [createRazorpayOrder] Order service responded successfully`);
-      
+
       const orderData = response.data?.data;
 
       if (!orderData) {
@@ -56,7 +56,7 @@ export const createRazorpayOrder = asyncHandler(
       // 🔥 CREATE RAZORPAY ORDER
       const razorpayInstance = getRazorpayInstance();
       const razorpayOrder = await razorpayInstance.orders.create({
-        amount: amount, 
+        amount: amount,
         currency: "INR",
         receipt: orderData.orderId.toString(),
       });
@@ -141,7 +141,7 @@ export const confirmCODOrder = asyncHandler(
     // 🔐 INTERNAL SECURITY CHECK - to verify order exists
     const orderServiceUrl = `/api/v1/orders/${orderId}/payment`;
     console.log(`🟡 [confirmCODOrder] Verifying order: ${orderServiceUrl}`);
-    
+
     // Add auth token to axios
     const token = req.headers.authorization?.split(" ")[1];
     if (token) {
@@ -151,7 +151,7 @@ export const confirmCODOrder = asyncHandler(
     try {
       const response = await axiosClient.get(orderServiceUrl);
       console.log(`🟢 [confirmCODOrder] Order verified successfully`);
-      
+
       const orderData = response.data?.data;
 
       if (!orderData) {

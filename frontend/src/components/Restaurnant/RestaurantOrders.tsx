@@ -84,7 +84,7 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, currentStatus: string) => {
+  const onUpdateOrder = async (orderId: string, currentStatus: string) => {
     const currentIndex = ACTIVE_STATUSES.indexOf(currentStatus);
     if (currentIndex === -1 || currentIndex >= ACTIVE_STATUSES.length - 1) return;
     
@@ -120,7 +120,7 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {orders.map(order => (
-            <OrderCard key={order._id} order={order} onUpdateStatus={handleUpdateStatus} />
+            <OrderCard key={order._id} order={order} onUpdateOrder={onUpdateOrder} />
           ))}
         </div>
       )}

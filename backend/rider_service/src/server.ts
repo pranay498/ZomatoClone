@@ -5,6 +5,7 @@ import riderRoutes from "./routes/rider.routes";
 import { errorMiddleware } from "./utils/AppError";
 import { connectDB } from "./config/db";
 import { connectRabbitMQ } from "./config/rabbitmq";
+import { startOrderReadyConsumer } from "./config/orderReadyConsumer";
 
 // Environment variables
 dotenv.config();
@@ -57,6 +58,7 @@ const startServer = async () => {
   try {
     await connectDB();
     await connectRabbitMQ();
+    await startOrderReadyConsumer(); // 🎧 Start consuming ORDER_READY events
 
     app.listen(PORT, () => {
       console.log(`

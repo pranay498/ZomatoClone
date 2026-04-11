@@ -14,7 +14,7 @@ export const connectRabbitMQ = async () => {
     });
 
     // ✅ queue ensure karo
-    await channel.assertQueue(process.env.ORDER_READY_QUEUE!, {
+    await channel.assertQueue(process.env.RIDER_QUEUE!, {
       durable: true,
     });
 
