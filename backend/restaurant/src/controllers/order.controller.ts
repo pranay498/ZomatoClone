@@ -433,7 +433,7 @@ export const getCurrentOrderForRider = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
 
 
-    const riderId = req.headers["x-user-id"] || req.userId;
+    const riderId = req.headers["x-user-id"]
 
     if (!riderId) return next(new AppError("Unauthorized - Missing user ID", 401));
 
@@ -451,13 +451,20 @@ export const getCurrentOrderForRider = asyncHandler(
     });
   }
 );
-
 export const updateOrderStatusRider = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
 
-    // 🔐 Internal service key check
+    // 🔐 1. Internal service key check (MUST HAVE FOR MICROSERVICES)
+    const receivedKey = req.headers["x-internal-key"];
+    const expectedKey = process.env.INTERNAL_SERVICE_KEY;
 
-    const riderId = req.userId;
+    if (receivedKey !== expectedKey) {
+      console.error("❌ [updateOrderStatusRider] Forbidden - key mismatch");
+      throw new AppError("Forbidden", 403);
+    }
+
+    // 🚨 2. MICROSERVICE FIX: ID Header Check
+    const riderId = req.headers["x-user-id"] || req.userId;
     const { orderId, status } = req.body;
 
     console.log("🚴 [Rider Status Update] Request received");
@@ -485,7 +492,6 @@ export const updateOrderStatusRider = asyncHandler(
 
     console.log(`✅ [Rider Status Update] Order ${orderId} updated to ${status}`);
 
-    // 📡 Notify the customer via Realtime Service
     // 📡 Notify BOTH Customer and Restaurant via Realtime Service
     const notifyPartiesRiderUpdate = async () => {
       const notifications = [

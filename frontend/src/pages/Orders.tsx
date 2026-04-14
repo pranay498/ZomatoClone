@@ -5,6 +5,8 @@ import OrderCard from "../components/OrderCard";
 import toast from "react-hot-toast";
 import { useSocket } from "../Context/SocketContext";
 
+// yeh componet customer order ke liye hai 
+
 const Orders = () => {
   const [orders, setOrders] = useState<IOrder[]>([]);
   const [loading, setLoading] = useState(true);

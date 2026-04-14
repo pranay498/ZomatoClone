@@ -151,7 +151,7 @@ export const toggleRiderAvailability = asyncHandler(async (req: Request, res: Re
 // Calls Restaurant Service → PUT /orders/assign/rider
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const acceptOrder = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-  const riderId = req.userId;
+  const riderId = req.userId || req.headers["x-user-id"];
   const { orderId } = req.body;
 
   console.log("🚴 [Accept Order] Request received");
@@ -224,8 +224,7 @@ export const acceptOrder = asyncHandler(async (req: Request, res: Response, next
 
 export const getCurrentOrder = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
 
-  // API Gateway se aayi hui ID pakdo
-  const riderId = req.userId || req.headers["x-user-id"];
+  const riderId = req.headers["x-user-id"] || req.userId;
 
   console.log("🚴 [Get Current Order] Request received");
   console.log("  Rider ID:", riderId);
@@ -233,13 +232,13 @@ export const getCurrentOrder = asyncHandler(async (req: Request, res: Response, 
   if (!riderId) return next(new AppError("Unauthorized - Missing user ID", 401));
 
   try {
-    // 🚨 FIX: Make sure this points to the ORDER service, not restaurant service
+    // 🚨 BUG FIX: Changed ORDER_SERVICE_URL to RESTAURANT_SERVICE_URL
     const response = await axios.get(
-      `${process.env.ORDER_SERVICE_URL}/orders/rider/current`,
+      `${process.env.RESTAURANT_SERVICE_URL}/orders/rider/current`,
       {
         headers: {
           "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
-          "x-user-id": riderId, // 🔥 Pushing the ID to the next service
+          "x-user-id": riderId,
           "Content-Type": "application/json",
         },
       }
@@ -253,7 +252,9 @@ export const getCurrentOrder = asyncHandler(async (req: Request, res: Response, 
     });
   } catch (error: any) {
     const status = error.response?.status || 500;
-    const message = error.response?.data?.message || "Failed to fetch current order";
+
+    // Agar Order Service response deta hai toh message aayega, warna network error
+    const message = error.response?.data?.message || "Failed to communicate with Order Service";
 
     if (status === 404) {
       return res.status(200).json({
@@ -263,6 +264,7 @@ export const getCurrentOrder = asyncHandler(async (req: Request, res: Response, 
       });
     }
 
+    console.error(`❌ [Get Current Order] Error:`, message);
     return next(new AppError(message, status));
   }
 });
@@ -272,7 +274,7 @@ export const getCurrentOrder = asyncHandler(async (req: Request, res: Response, 
 // Calls Restaurant Service → PUT /orders/rider/status
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const updateOrderStatus = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
-  const riderId = req.userId;
+  const riderId = req.headers["x-user-id"] || req.headers["userid"] || req.userId;
   const { orderId, status } = req.body;
 
   console.log("🚴 [Update Order Status] Request received");

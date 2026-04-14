@@ -4,7 +4,7 @@ import { useSocket } from "../../Context/SocketContext";
 import { IOrder } from "../../types";
 import toast from "react-hot-toast";
 import { gold, goldBorder, textMuted } from "./Restaurant.shared";
-import OrderCard from "../OrderCard";
+import OrderCard from "../OrderCard"; // Make sure path is correct
 
 const ACTIVE_STATUSES = [
   "placed",
@@ -53,7 +53,7 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
 
     const onNewOrder = (payload: any) => {
       console.log("New Order received socket", payload);
-      
+
       // Attempt to play sound
       if (audioRef.current && audioUnlocked) {
         audioRef.current.play().catch(err => console.error("Audio block:", err));
@@ -87,10 +87,10 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
   const onUpdateOrder = async (orderId: string, currentStatus: string) => {
     const currentIndex = ACTIVE_STATUSES.indexOf(currentStatus);
     if (currentIndex === -1 || currentIndex >= ACTIVE_STATUSES.length - 1) return;
-    
+
     // In a real UI we might show a dropdown, but advance sequential for simplicity matching zomato partner flows
     const nextStatus = ACTIVE_STATUSES[currentIndex + 1];
-    
+
     try {
       const res = await updateOrderStatus(orderId, nextStatus);
       if (res.success) {
@@ -103,6 +103,21 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  // ==========================================
+  // 🚨 NEW: Function to manually retry Rider Ping
+  // ==========================================
+  const handleRetryRiderSearch = async (orderId: string) => {
+    try {
+      // By sending "ready_for_rider" again, the backend will re-publish the RabbitMQ event!
+      const res = await updateOrderStatus(orderId, "ready_for_rider");
+      if (res.success) {
+        toast.success("Pinged nearby riders again! 🛵");
+      }
+    } catch (error: any) {
+      toast.error("Failed to ping riders. Please try again.");
+    }
+  };
+
   if (loading) {
     return <div style={{ color: textMuted, padding: "20px", textAlign: "center" }}>Loading existing orders...</div>;
   }
@@ -111,7 +126,7 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
     <div style={{ padding: "20px 0" }} onClick={unlockAudio}>
       {!audioUnlocked && (
         <div style={{ backgroundColor: "rgba(212,175,100,0.1)", padding: "12px", borderRadius: "4px", marginBottom: "20px", border: `1px solid ${goldBorder}`, color: gold, fontSize: "14px", textAlign: "center", cursor: "pointer" }}>
-           Tap anywhere to enable notification sounds 🔔
+          Tap anywhere to enable notification sounds 🔔
         </div>
       )}
 
@@ -120,7 +135,12 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {orders.map(order => (
-            <OrderCard key={order._id} order={order} onUpdateOrder={onUpdateOrder} />
+            <OrderCard
+              key={order._id}
+              order={order}
+              onUpdateOrder={onUpdateOrder}
+              onRetrySearch={handleRetryRiderSearch}
+            />
           ))}
         </div>
       )}
