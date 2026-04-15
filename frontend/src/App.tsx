@@ -14,6 +14,7 @@ import AddressPaymentPage from "./pages/AddressPaymentPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import Orders from "./pages/Orders";
 import RiderDashboard from "./pages/Rider/RiderDashboard";
+import AccountPage from "./pages/AccountPage";
 
 export default function App() {
 
@@ -31,6 +32,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
             <Route path="/select-role" element={<SelectedRole />} />
+            <Route path="/account" element={<AccountPage />} />
             <Route path="/restaurant" element={<RestaurantPage />} />
             <Route path="/restaurant/:id" element={<RestaurantDetail />} />
             <Route path="/address-payment" element={< AddressPaymentPage />} />

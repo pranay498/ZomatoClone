@@ -9,6 +9,7 @@ import {
 } from "../../services/api";
 import { useSocket } from "../../Context/SocketContext";
 import { IOrder } from "../../types";
+import RiderMap from "./RiderMap";
 
 interface Props {
   riderData: RiderProfile;
@@ -23,6 +24,7 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
   const [activeOrder, setActiveOrder] = useState<IOrder | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [btnLoading, setBtnLoading] = useState(false);
+  const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { socket } = useSocket();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -86,12 +88,31 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
 
     console.log("📍 [Live Tracking] Broadcasting location...");
 
+    // Immediate first ping
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setMyLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+          const payload = {
+            orderId: activeOrder._id,
+            userId: activeOrder.userId,
+            restaurantId: activeOrder.restaurantId,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          socket.emit("rider:live_location", payload);
+        }
+      );
+    }
+
     const locationInterval = setInterval(() => {
       if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
+            setMyLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
             const payload = {
               orderId: activeOrder._id,
+              userId: activeOrder.userId,
               restaurantId: activeOrder.restaurantId,
               lat: position.coords.latitude,
               lng: position.coords.longitude
@@ -391,14 +412,20 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
                   </div>
 
                   <div className="hidden lg:block bg-black/40 border border-white/5 rounded-3xl p-6 h-full">
-                    <div className="h-full flex flex-col items-center justify-center text-center">
-                      <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
-                        <svg className="w-8 h-8 text-emerald-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {activeOrder.deliveryAddress ? (
+                      <RiderMap 
+                        myLocation={myLocation} 
+                        customerLat={activeOrder.deliveryAddress.latitude} 
+                        customerLng={activeOrder.deliveryAddress.longitude} 
+                      />
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center">
+                        <svg className="w-8 h-8 text-emerald-500 animate-bounce mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         </svg>
+                        <p className="text-stone-400 text-sm">Navigation active.<br />Follow the route to the restaurant/customer.</p>
                       </div>
-                      <p className="text-stone-400 text-sm">Navigation active.<br />Follow the route to the restaurant/customer.</p>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>

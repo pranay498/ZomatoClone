@@ -588,7 +588,7 @@ const CheckoutPage: React.FC = () => {
                 <button onClick={() => navigate("/")} style={{ padding:"13px 24px", background:goldFaint, border:`1px solid ${goldBorder}`, borderRadius:2, color:gold, fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:600, letterSpacing:"0.18em", textTransform:"uppercase", cursor:"pointer" }}>
                   Home
                 </button>
-                <button onClick={() => navigate(`/orders/${orderId}`)} style={{ padding:"13px 24px", background:"linear-gradient(135deg,#b8860b 0%,#daa520 40%,#e8c84a 60%,#b8860b 100%)", border:"none", borderRadius:2, color:"#120d00", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, letterSpacing:"0.22em", textTransform:"uppercase", cursor:"pointer" }}>
+                <button onClick={() => navigate("/orders")} style={{ padding:"13px 24px", background:"linear-gradient(135deg,#b8860b 0%,#daa520 40%,#e8c84a 60%,#b8860b 100%)", border:"none", borderRadius:2, color:"#120d00", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, letterSpacing:"0.22em", textTransform:"uppercase", cursor:"pointer" }}>
                   Track Order
                 </button>
               </div>

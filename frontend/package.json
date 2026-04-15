@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.4",
+    "@types/leaflet-routing-machine": "^3.2.9",
     "amqplib": "^1.0.3",
     "axios": "^1.13.6",
     "leaflet": "^1.9.4",
+    "leaflet-routing-machine": "^3.2.12",
     "razorpay": "^2.9.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

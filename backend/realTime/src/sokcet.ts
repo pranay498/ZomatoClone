@@ -77,6 +77,21 @@ export const initSocket = (server: http.Server) => {
       console.log("📩 Message from:", userId, data);
     });
 
+    // 🔥 Listen for Rider Live Location Updates
+    socket.on("rider:live_location", (data) => {
+      console.log(`📍 Live location from rider for order ${data.orderId}:`, data.lat, data.lng);
+
+      // Relay to the specific Customer
+      if (data.userId) {
+        socket.to(data.userId).emit("RIDER_LOCATION_UPDATED", data);
+      }
+
+      // Relay to the Restaurant if needed
+      if (data.restaurantId) {
+        socket.to(`restaurant:${data.restaurantId}`).emit("RIDER_LOCATION_UPDATED", data);
+      }
+    });
+
     // Disconnect
     socket.on("disconnect", () => {
       console.log("🔴 User disconnected:", socket.id);

@@ -11,7 +11,7 @@ export const realtimeProxy = proxy(REALTIME_SERVICE_URL, {
   proxyReqPathResolver: (req) => {
     let newPath = req.originalUrl;
 
-    // Route: /api/v1/notifications/* → /internal/*
+
     if (req.originalUrl.startsWith("/api/v1/notifications")) {
       newPath = req.originalUrl.replace("/api/v1/notifications", "/internal");
     }

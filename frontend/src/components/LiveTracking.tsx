@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import "leaflet-routing-machine";
 import { useSocket } from "../Context/SocketContext";
 import { IOrder } from "../types";
 
@@ -24,6 +25,44 @@ interface Props {
     order: IOrder;
     restaurantId: string;
 }
+
+const RoutingComponent = ({ startLat, startLng, endLat, endLng }: { startLat: number, startLng: number, endLat: number, endLng: number }) => {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!map) return;
+        const LAny = L as any;
+
+        if (!LAny.Routing) return;
+
+        const routingControl = LAny.Routing.control({
+            waypoints: [
+                L.latLng(startLat, startLng),
+                L.latLng(endLat, endLng)
+            ],
+            lineOptions: {
+                styles: [{ color: "#10b981", weight: 4, dashArray: "10, 10" }],
+                extendToWaypoints: true,
+                missingRouteTolerance: 10
+            },
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: false,
+            show: false,
+            createMarker: () => null,
+        }).addTo(map);
+
+        return () => {
+            try {
+                map.removeControl(routingControl);
+            } catch (e) {
+                // Ignore errors when unmounting
+            }
+        };
+    }, [map, startLat, startLng, endLat, endLng]);
+
+    return null;
+};
 
 const LiveTrackingMap: React.FC<Props> = ({ order, restaurantId }) => {
     const { socket } = useSocket();
@@ -126,14 +165,13 @@ const LiveTrackingMap: React.FC<Props> = ({ order, restaurantId }) => {
                     </Marker>
                 )}
 
-                {/* Connecting Line */}
-                {polylinePositions.length === 2 && (
-                    <Polyline
-                        positions={polylinePositions}
-                        color="#10b981"
-                        weight={3}
-                        dashArray="10, 10" // Creates a dashed line effect
-                        className="animate-pulse"
+                {/* Connecting Line - Using Leaflet Routing Machine */}
+                {customerLat && customerLng && (
+                    <RoutingComponent
+                        startLat={riderLocation.lat}
+                        startLng={riderLocation.lng}
+                        endLat={customerLat}
+                        endLng={customerLng}
                     />
                 )}
             </MapContainer>
@@ -141,4 +179,4 @@ const LiveTrackingMap: React.FC<Props> = ({ order, restaurantId }) => {
     );
 };
 
-export default LiveTrackingMap;
+export default LiveTrackingMap; 
