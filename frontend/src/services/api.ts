@@ -1,12 +1,5 @@
 /**
  * services/api.ts
- * ─────────────────────────────────────────────────────────────────
- * Single source of truth for ALL backend API calls.
- * Each function maps to exactly ONE backend route.
- * ─────────────────────────────────────────────────────────────────
- */
-/**
- * services/api.ts
  * All backend API calls. One function = one route.
  */
 
@@ -15,35 +8,35 @@ import apiClient from "./apiClient"; // your axios instance
 // ── TYPES ──────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
-  addressId:     string;
+  addressId: string;
   paymentMethod: "cod" | "upi" | "card";
-  totalAmount:   number;  // must match backend cart calculation
-  userPhone?:    string;
-  restaurantId:  string;
+  totalAmount: number;  // must match backend cart calculation
+  userPhone?: string;
+  restaurantId: string;
 }
 
 export interface CreateOrderResponse {
-  success:   boolean;
-  orderId?:  string;  // MongoDB _id — use for all subsequent calls
-  status?:   string;  // "pending"
-  message?:  string;
+  success: boolean;
+  orderId?: string;  // MongoDB _id — use for all subsequent calls
+  status?: string;  // "pending"
+  message?: string;
 }
 
 export interface RazorpayOrderResponse {
-  success:          boolean;
+  success: boolean;
   razorpayOrderId?: string;  // Razorpay order_id e.g. "order_abc123"
-  amount?:          number;  // in paise
-  currency?:        string;
-  message?:         string;
+  amount?: number;  // in paise
+  currency?: string;
+  message?: string;
 }
 
 export interface VerifyPaymentResponse {
-  success:  boolean;
+  success: boolean;
   message?: string;
 }
 
 export interface ConfirmCODResponse {
-  success:  boolean;
+  success: boolean;
   message?: string;
 }
 
@@ -51,15 +44,15 @@ export interface ConfirmCODResponse {
 
 /** POST /api/v1/user/address/validate */
 export async function validateAndSaveAddress(payload: {
-  fullAddress:  string;
+  fullAddress: string;
   addressLine2?: string;
-  landmark?:    string;
-  city:         string;
-  state:        string;
-  pincode:      string;
-  addressType:  "home" | "work" | "other";
-  coordinates:  { lat: number; lng: number } | null;
-  phoneNumber:  string;
+  landmark?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  addressType: "home" | "work" | "other";
+  coordinates: { lat: number; lng: number } | null;
+  phoneNumber: string;
 }): Promise<{ success: boolean; message?: string; addressId?: string }> {
   const res = await apiClient.post("/user/address/validate", payload);
   return res.data;
@@ -73,8 +66,8 @@ export async function reverseGeocodeLatLng(lat: number, lng: number) {
   const d = await res.json();
   return {
     displayName: d?.display_name ?? "",
-    city:    d?.address?.city ?? d?.address?.town ?? d?.address?.village ?? "",
-    state:   d?.address?.state ?? "",
+    city: d?.address?.city ?? d?.address?.town ?? d?.address?.village ?? "",
+    state: d?.address?.state ?? "",
     pincode: d?.address?.postcode ?? "",
   };
 }
@@ -178,10 +171,10 @@ export async function createRazorpayOrder(payload: {
  * Rider Service consumer updates order status to "placed", paymentStatus to "paid".
  */
 export async function verifyRazorpayPayment(payload: {
-  orderId:             string;  // YOUR MongoDB orderId
-  razorpay_order_id:   string;  // Razorpay's order_id
+  orderId: string;  // YOUR MongoDB orderId
+  razorpay_order_id: string;  // Razorpay's order_id
   razorpay_payment_id: string;
-  razorpay_signature:  string;
+  razorpay_signature: string;
 }): Promise<VerifyPaymentResponse> {
   console.log("🔵 API: verifyRazorpayPayment payload:", payload);
   try {
