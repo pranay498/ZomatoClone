@@ -15,6 +15,7 @@ import CheckoutPage from "./pages/CheckoutPage";
 import Orders from "./pages/Orders";
 import RiderDashboard from "./pages/Rider/RiderDashboard";
 import AccountPage from "./pages/AccountPage";
+import AdminDashboard from "./components/AdminDashboard";
 
 export default function App() {
 
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/address-payment" element={< AddressPaymentPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/orders" element={<Orders />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/rider/dashboard" element={<RiderDashboard />} />
           </Route>
         </Routes>

@@ -7,13 +7,13 @@ import { AppError } from "../utils/AppError";
 
 export const createRiderProfile = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const userId = req.userId;
-  const { phoneNumber, addharNumber, drivingLicenseNumber, longitude, latitude } = req.body;
+  const { name, phoneNumber, addharNumber, drivingLicenseNumber, longitude, latitude } = req.body;
 
   if (!userId) {
     return next(new AppError("User ID not provided. Ensure you are authenticated.", 401));
   }
 
-  if (!phoneNumber || !addharNumber || !drivingLicenseNumber) {
+  if (!name || !phoneNumber || !addharNumber || !drivingLicenseNumber) {
     return next(new AppError("Missing required fields", 400));
   }
 
@@ -43,6 +43,7 @@ export const createRiderProfile = asyncHandler(async (req: Request, res: Respons
   // Create Rider
   const newRider = new Rider({
     userId,
+    name,
     phoneNumber,
     addharNumber,
     drivingLicenseNumber,
@@ -102,10 +103,11 @@ export const toggleRiderAvailability = asyncHandler(async (req: Request, res: Re
   // ==========================================
   try {
     const orderResponse = await axios.get(
-      `${process.env.ORDER_SERVICE_URL}/orders/rider/current`, // Make sure URL matches your setup
+      `${process.env.RESTAURANT_SERVICE_URL}/orders/rider/current`, 
       {
         headers: {
-          "x-user-id": userId // Pass the Rider's ID to the order service
+          "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
+          "x-user-id": userId 
         }
       }
     );

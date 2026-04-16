@@ -99,6 +99,9 @@ const Navbar = () => {
     ...(user?.role === "seller"
       ? [{ to: "/restaurant", icon: <span className="text-base">🍽️</span>, label: "My Restaurant" }]
       : []),
+    ...(user?.role === "admin"
+      ? [{ to: "/admin", icon: <span className="text-base">🛡️</span>, label: "Admin Panel" }]
+      : []),
   ];
 
   return (

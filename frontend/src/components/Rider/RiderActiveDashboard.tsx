@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useApp } from "../../Context/MainContext";
 import toast from "react-hot-toast";
 import {
   toggleRiderAvailability,
@@ -48,6 +50,17 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
       }
     };
     fetchCurrent();
+  }, []);
+
+  // 🚀 Auto-toggle online when rider logs in
+  useEffect(() => {
+    if (!riderData.isAvailable && riderData.isVerified) {
+      // Small timeout to ensure everything is mounted
+      setTimeout(() => {
+        handleToggle();
+      }, 500);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 📡 Socket Listeners
@@ -133,7 +146,22 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
     };
   }, [socket, activeOrder]);
 
+  const { setToken, setUser, setIsAuth } = useApp();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
+    setIsAuth(false);
+    toast.success("Logged out successfully");
+    navigate("/login");
+  };
+
   const handleToggle = async () => {
+    // ... existing handleToggle logic ...
     setToggling(true);
     try {
       const payload: any = {};
@@ -262,18 +290,31 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
             )}
           </div>
 
-          <div className="bg-[#141210]/60 backdrop-blur-md border border-amber-500/10 rounded-2xl p-8 flex items-center gap-6">
-            {riderData.picture ? (
-              <img src={riderData.picture} alt="Rider" className="w-16 h-16 rounded-full border border-amber-500/30 p-1 object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-full border border-amber-500/30 bg-amber-500/10 flex items-center justify-center text-amber-500 flex-shrink-0">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+          <div className="bg-[#141210]/60 backdrop-blur-md border border-amber-500/10 rounded-2xl p-6 flex items-center justify-between gap-4">
+            <div className="flex flex-1 items-center gap-4">
+              {riderData.picture ? (
+                <img src={riderData.picture} alt="Rider" className="w-14 h-14 rounded-full border border-amber-500/30 p-0.5 object-cover shrink-0" />
+              ) : (
+                <div className="w-14 h-14 rounded-full border border-amber-500/30 bg-amber-500/10 flex items-center justify-center text-amber-500 flex-shrink-0">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                </div>
+              )}
+              <div className="flex-1 w-full overflow-hidden">
+                <h4 className="text-amber-50 font-bold tracking-wide text-lg truncate" title={riderData.name}>{riderData.name}</h4>
+                <div className="flex items-center gap-2 mt-0.5">
+                   <p className="text-amber-500/80 text-[10px] font-mono leading-none bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">ID:{riderData.userId.slice(-6).toUpperCase()}</p>
+                   <p className="text-stone-400 text-xs leading-none">{riderData.phoneNumber}</p>
+                </div>
               </div>
-            )}
-            <div>
-              <h4 className="text-amber-50 font-medium tracking-wide">ID: {riderData.userId.slice(-6).toUpperCase()}</h4>
-              <p className="text-stone-400 text-sm">{riderData.phoneNumber}</p>
             </div>
+            
+            <button 
+              onClick={handleLogout}
+              className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all duration-300 border border-red-500/20 shrink-0 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+              title="Logout / Sign Off"
+            >
+              <svg className="w-5 h-5 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </button>
           </div>
         </div>
 

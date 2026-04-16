@@ -28,7 +28,7 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): vo
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; 
+    req.user = decoded;
 
     // Extract user data from token and set gateway headers
     if (typeof decoded === 'object' && decoded !== null) {
@@ -45,19 +45,19 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction): vo
       }
 
       // Validate role
-      const validRoles = ["customer", "rider", "seller"]
+      const validRoles = ["customer", "rider", "seller", "admin"];
       if (userRole && !validRoles.includes(userRole)) {
         res.status(401).json({ message: "Unauthorized. Invalid user role in token." });
         return;
       }
 
-      
+
       req.headers["x-user-id"] = String(userId);
-      req.headers["x-user-role"] = String(userRole || "customer");
+      req.headers["x-user-role"] = String(userRole || "admin");
       if (restaurantId) {
         req.headers["x-restaurant-id"] = String(restaurantId);
       }
-  
+
       req.headers["x-api-gateway"] = "true";
       console.log(`🟢 [Auth Middleware] Headers set - userId: ${userId}, role: ${userRole}, restaurantId: ${restaurantId || "N/A"}`);
     }

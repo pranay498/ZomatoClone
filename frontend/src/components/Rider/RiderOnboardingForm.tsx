@@ -7,6 +7,7 @@ interface Props {
 }
 
 const RiderOnboardingForm: React.FC<Props> = ({ onComplete }) => {
+  const [name, setName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [addharNumber, setAddharNumber] = useState("");
   const [drivingLicenseNumber, setDrivingLicenseNumber] = useState("");
@@ -34,7 +35,7 @@ const RiderOnboardingForm: React.FC<Props> = ({ onComplete }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneNumber || !addharNumber || !drivingLicenseNumber) {
+    if (!name || !phoneNumber || !addharNumber || !drivingLicenseNumber) {
       toast.error("Please fill in all required fields!");
       return;
     }
@@ -42,6 +43,7 @@ const RiderOnboardingForm: React.FC<Props> = ({ onComplete }) => {
     setLoading(true);
 
     const formData = new FormData();
+    formData.append("name", name);
     formData.append("phoneNumber", phoneNumber);
     formData.append("addharNumber", addharNumber);
     formData.append("drivingLicenseNumber", drivingLicenseNumber);
@@ -128,6 +130,14 @@ const RiderOnboardingForm: React.FC<Props> = ({ onComplete }) => {
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "32px" }}>
+
+              <div>
+                <label style={labelStyle}>Full Name</label>
+                <input
+                  type="text" value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe" className="premium-input" style={inputStyle}
+                />
+              </div>
 
               <div>
                 <label style={labelStyle}>Phone Number</label>

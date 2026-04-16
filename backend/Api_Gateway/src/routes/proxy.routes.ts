@@ -5,6 +5,7 @@ import { restaurantProxy } from "../proxy/restaurant.proxy";
 import { paymentProxy } from "../proxy/payment.proxy";
 import { realtimeProxy } from "../proxy/realtime.proxy";
 import { riderProxy } from "../proxy/rider.proxy";
+import { adminProxy } from "../proxy/admin.proxy";
 import { verifyToken } from "../middlewares/auth.middleware";
 
 const router = Router();
@@ -41,5 +42,8 @@ router.use("/notifications", realtimeProxy);
 
 // Rider service routes (protected via gateway or handled inside)
 router.use("/riders", verifyToken, riderProxy);
+
+// Admin service routes (protected via gateway)
+router.use("/admin", verifyToken, adminProxy);
 
 export default router;

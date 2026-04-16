@@ -8,9 +8,6 @@ import { AppError } from "../utils/AppError";
 import { Restaurant } from "../models/Restaurnent";
 import { publishEvent } from "../config/order.publisher";
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CREATE ORDER
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const createOrder = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.userId;
@@ -83,7 +80,6 @@ export const createOrder = asyncHandler(
     });
   }
 );
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FETCH ORDER FOR PAYMENT (Internal)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -120,7 +116,6 @@ export const fetchOrderForPayment = asyncHandler(
     });
   }
 );
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FETCH RESTAURANT ORDERS (Restaurant Owner)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -160,10 +155,6 @@ export const fetchRestaurantOrders = asyncHandler(
     });
   }
 );
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// UPDATE ORDER STATUS (Restaurant Owner)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const updateOrderStatus = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
     const userId = req.userId;
@@ -264,7 +255,6 @@ export const updateOrderStatus = asyncHandler(
     });
   }
 );
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GET MY ORDERS (Customer)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -282,7 +272,6 @@ export const getMyOrders = asyncHandler(
     });
   }
 );
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FETCH SINGLE ORDER (Customer)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -307,7 +296,6 @@ export const fetchSingleOrder = asyncHandler(
     });
   }
 );
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ASSIGN RIDER TO ORDER (Internal — called by Rider Service)
 // POST /orders/assign-rider
@@ -428,7 +416,6 @@ export const assignRiderToOrder = asyncHandler(
     });
   }
 );
-
 export const getCurrentOrderForRider = asyncHandler(
   async (req: any, res: Response, next: NextFunction) => {
 
@@ -536,3 +523,4 @@ export const updateOrderStatusRider = asyncHandler(
     });
   }
 );
+

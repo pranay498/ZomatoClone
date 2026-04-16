@@ -227,6 +227,7 @@ export async function syncCart(payload: {
 export interface RiderProfile {
   _id: string;
   userId: string;
+  name: string;
   picture: string;
   phoneNumber: string;
   addharNumber: string;
@@ -304,5 +305,27 @@ export async function getCurrentRiderOrder(): Promise<{ success: boolean; data: 
  */
 export async function updateRiderOrderStatus(orderId: string, status: "picked_up" | "delivered"): Promise<{ success: boolean; message: string; data?: any }> {
   const res = await apiClient.put("/riders/orders/status", { orderId, status });
+  return res.data;
+}
+
+// ── ADMIN ──────────────────────────────────────────────────────────
+
+export async function fetchPendingRestaurants(): Promise<{ success: boolean; data: any[] }> {
+  const res = await apiClient.get("/admin/restaurants/pending");
+  return res.data;
+}
+
+export async function verifyRestaurant(id: string): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.patch(`/admin/restaurants/${id}/verify`);
+  return res.data;
+}
+
+export async function fetchPendingRiders(): Promise<{ success: boolean; data: any[] }> {
+  const res = await apiClient.get("/admin/riders/pending");
+  return res.data;
+}
+
+export async function verifyRider(id: string): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.patch(`/admin/riders/${id}/verify`);
   return res.data;
 }

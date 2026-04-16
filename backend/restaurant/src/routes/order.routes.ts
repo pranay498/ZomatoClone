@@ -18,9 +18,7 @@ const router = Router();
 router.post("/create", requireAuth, createOrder);
 router.get("/my", requireAuth, getMyOrders);
 
-// ── Internal Server-to-Server Calls (STATIC ROUTES FIRST) ─────────────────
-// 🚨 These MUST be above /:orderId routes so they don't get intercepted!
-// 🚨 Removed requireAuth because these are called internally via Axios, not the frontend.
+
 
 router.get("/rider/current", getCurrentOrderForRider);         // GET /rider/current
 router.put("/assign/rider", assignRiderToOrder);               // PUT /assign/rider
