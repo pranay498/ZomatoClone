@@ -40,8 +40,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl"
-        style={{ background: cardBg, border: `1px solid ${goldBorder}` }}
+        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl"
+        style={{ 
+          background: cardBg, 
+          border: `1px solid ${goldBorder}`,
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 15px rgba(212, 175, 100, 0.1)"
+        }}
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
       >
         {/* Header */}
@@ -80,22 +84,48 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
             </div>
           </div>
 
-          {/* Delivery Details */}
-          {order.deliveryAddress && (
-            <div className="mb-6">
-              <h3 className="text-sm uppercase tracking-wider mb-3" style={{ color: gold }}>📍 Delivery Information</h3>
-              <div className="bg-black/20 p-4 rounded-lg border border-white/5 space-y-2">
-                <p className="text-sm text-gray-300">
-                  <span className="text-gray-500 mr-2">Address:</span>
-                  {order.deliveryAddress.formattedAddress}
-                </p>
-                <p className="text-sm text-gray-300">
-                  <span className="text-gray-500 mr-2">Contact:</span>
-                  +91 {order.deliveryAddress.mobile}
-                </p>
+          {/* Grid Layout for Info Sections */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Delivery Details */}
+            {order.deliveryAddress && (
+              <div className="flex flex-col">
+                <h3 className="text-sm uppercase tracking-wider mb-3" style={{ color: gold }}>📍 Delivery Information</h3>
+                <div className="bg-black/20 p-5 rounded-lg border border-white/5 space-y-3 flex-grow">
+                  <p className="text-sm text-gray-300 leading-relaxed">
+                    <span className="text-gray-500 block text-xs uppercase mb-1">Address</span>
+                    {order.deliveryAddress.formattedAddress}
+                  </p>
+                  <p className="text-sm text-gray-300">
+                    <span className="text-gray-500 block text-xs uppercase mb-1">Contact</span>
+                    <span className="text-gray-200 font-medium">+91 {order.deliveryAddress.mobile}</span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Info */}
+            <div className="flex flex-col">
+              <h3 className="text-sm uppercase tracking-wider mb-3" style={{ color: gold }}>💳 Payment Details</h3>
+              <div className="bg-black/20 p-5 rounded-lg border border-white/5 space-y-3 flex-grow">
+                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                  <span className="text-gray-400">Method</span>
+                  <span className="text-gray-200 font-medium capitalize">{order.paymentMethod === "cod" ? "Cash on Delivery" : "Online Payment"}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                  <span className="text-gray-400">Status</span>
+                  <span className={`font-medium px-2 py-0.5 rounded text-xs ${order.paymentStatus === 'paid' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'} capitalize`}>
+                    {order.paymentStatus}
+                  </span>
+                </div>
+                {order.paymentId && (
+                  <div className="flex flex-col space-y-1">
+                    <span className="text-gray-400 text-xs">Transaction ID</span>
+                    <span className="text-gray-200 text-xs font-mono bg-black/30 px-2 py-1 rounded truncate">{order.paymentId}</span>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
 
           {/* Rider Details (If assigned) */}
           {order.riderName && (
@@ -125,48 +155,38 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
           )}
 
           {/* Order Items */}
-          <div className="mb-6">
-            <h3 className="text-sm uppercase tracking-wider mb-3" style={{ color: gold }}>🛍️ Order Summary</h3>
-            <div className="bg-black/20 p-4 rounded-lg border border-white/5">
-              {order.items.map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between text-sm text-gray-200 py-2 border-b border-white/5 last:border-0">
-                  <span>
-                    <span style={{ color: gold, fontWeight: "bold" }} className="mr-2">{item.quantity}x</span>
-                    {item.name}
-                  </span>
-                  <span>₹{item.price * item.quantity}</span>
-                </div>
-              ))}
+          <div className="mb-8">
+            <div className="flex justify-between items-end mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: gold }}>🛍️ Order Summary</h3>
+              <div className="text-xs text-gray-500">{order.items.length} items</div>
+            </div>
+            <div className="bg-black/25 rounded-xl border border-white/5 overflow-hidden">
+              <div className="p-1">
+                {order.items.map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="h-8 w-8 rounded-lg bg-gold/10 flex items-center justify-center border border-gold/20" style={{ color: gold }}>
+                        {item.quantity}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-200">{item.name}</p>
+                        <p className="text-xs text-gray-500">₹{item.price} per unit</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-200">₹{item.price * item.quantity}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-gold/5 p-5 flex justify-between items-center border-t border-gold/10">
+                <span className="text-sm font-bold text-gray-300 uppercase tracking-widest">Total Amount</span>
+                <span style={{ color: gold }} className="text-2xl font-black">₹{order.totalAmount}</span>
+              </div>
             </div>
           </div>
 
-          {/* Payment Info */}
-          <div>
-            <h3 className="text-sm uppercase tracking-wider mb-3" style={{ color: gold }}>💳 Payment Information</h3>
-            <div className="bg-black/20 p-4 rounded-lg border border-white/5 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Method</span>
-                <span className="text-gray-200 font-medium capitalize">{order.paymentMethod === "cod" ? "Cash on Delivery" : "Online Payment"}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Status</span>
-                <span className={`font-medium ${order.paymentStatus === 'paid' ? 'text-green-500' : 'text-yellow-500'} capitalize`}>
-                  {order.paymentStatus}
-                </span>
-              </div>
-              {order.paymentId && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Txn ID</span>
-                  <span className="text-gray-200 text-xs font-mono">{order.paymentId}</span>
-                </div>
-              )}
-              <hr className="border-white/10 my-2" />
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-gray-300 font-semibold">Grand Total</span>
-                <span style={{ color: gold }} className="text-xl font-bold">₹{order.totalAmount}</span>
-              </div>
-            </div>
-          </div>
+          {/* Payment Info Removal here as it's moved to the grid above */}
 
           {/* Action Buttons */}
           {onUpdateOrder && ACTIVE_STATUSES.indexOf(order.status) < ACTIVE_STATUSES.indexOf("ready_for_rider") && (

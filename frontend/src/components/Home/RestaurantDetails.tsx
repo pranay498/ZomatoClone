@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import MenuSection from "./MenuSection";
-import CartSidebar, { useCart, } from "./Cartsidebar";
+import CartSidebar from "./Cartsidebar";
+import { useCart } from "../../hooks/useCart";
 import { IRestaurant } from "../../types";
 
 

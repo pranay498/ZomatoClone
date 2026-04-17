@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { menuApi,
-  gold, goldBorder, goldFaint, textMuted, cardBg,
-  labelStyle, inputStyle,
-  Spinner, TrashIcon, PlusIcon,
-} from "./Restaurant.shared";
+import { gold, goldBorder, goldFaint, textMuted, cardBg, labelStyle, inputStyle, Spinner, TrashIcon, PlusIcon, } from "./Restaurant.shared";
 import { IMenuItem } from "../../types";
+import { menuApi } from "../../services/api";
 
 const CATEGORIES = ["Starters", "Main Course", "Desserts", "Beverages", "Snacks", "Breads", "Rice & Biryani", "Other"];
 type TabId = "menu" | "add" | "sales";
@@ -14,7 +11,7 @@ type TabId = "menu" | "add" | "sales";
 //  MENU ITEMS LIST
 // ─────────────────────────────────────────────
 const MenuItemsList: React.FC<{ restaurantId: string }> = ({ restaurantId }) => {
-  const [items, setItems]   = useState<IMenuItem[]>([]);
+  const [items, setItems] = useState<IMenuItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,8 +26,8 @@ const MenuItemsList: React.FC<{ restaurantId: string }> = ({ restaurantId }) => 
       await menuApi.remove(id);
       const confirmed = window.confirm("Are you sure you want to delete this item?");
       if (!confirmed) return;
-      else{
-      setItems(p => p.filter(i => i._id !== id));
+      else {
+        setItems(p => p.filter(i => i._id !== id));
       }
 
       toast.success("Item removed");
@@ -102,7 +99,7 @@ const MenuItemsList: React.FC<{ restaurantId: string }> = ({ restaurantId }) => 
 //  ADD ITEM FORM
 // ─────────────────────────────────────────────
 const AddItemForm: React.FC<{ restaurantId: string; onAdded: () => void }> = ({ restaurantId, onAdded }) => {
-  const [saving, setSaving]       = useState(false);
+  const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [form, setForm] = useState({ name: "", description: "", price: "", category: "Main Course" });
 
@@ -208,9 +205,9 @@ const MenuSection: React.FC<MenuSectionProps> = ({ restaurantId }) => {
   const [itemCount, setItemCount] = useState(0);
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: "menu",  label: "Menu Items" },
-    { id: "add",   label: "Add Item"   },
-    { id: "sales", label: "Sales"      },
+    { id: "menu", label: "Menu Items" },
+    { id: "add", label: "Add Item" },
+    { id: "sales", label: "Sales" },
   ];
 
   return (
@@ -237,15 +234,15 @@ const MenuSection: React.FC<MenuSectionProps> = ({ restaurantId }) => {
       {/* Panel */}
       <div style={{ position: "relative" }}>
         {[
-          { top: 0,    left: 0,  borderTop:    `1px solid ${goldBorder}`, borderLeft:   `1px solid ${goldBorder}` },
-          { top: 0,    right: 0, borderTop:    `1px solid ${goldBorder}`, borderRight:  `1px solid ${goldBorder}` },
-          { bottom: 0, left: 0,  borderBottom: `1px solid ${goldBorder}`, borderLeft:   `1px solid ${goldBorder}` },
-          { bottom: 0, right: 0, borderBottom: `1px solid ${goldBorder}`, borderRight:  `1px solid ${goldBorder}` },
+          { top: 0, left: 0, borderTop: `1px solid ${goldBorder}`, borderLeft: `1px solid ${goldBorder}` },
+          { top: 0, right: 0, borderTop: `1px solid ${goldBorder}`, borderRight: `1px solid ${goldBorder}` },
+          { bottom: 0, left: 0, borderBottom: `1px solid ${goldBorder}`, borderLeft: `1px solid ${goldBorder}` },
+          { bottom: 0, right: 0, borderBottom: `1px solid ${goldBorder}`, borderRight: `1px solid ${goldBorder}` },
         ].map((s, i) => <div key={i} style={{ position: "absolute", width: 20, height: 20, ...s, zIndex: 2 }} />)}
 
         <div style={{ background: cardBg, border: `1px solid rgba(212,175,100,0.1)`, borderTop: "none", borderRadius: "0 0 3px 3px", padding: "28px 32px", boxShadow: "0 24px 64px rgba(0,0,0,0.7)", minHeight: 200 }}>
-          {activeTab === "menu"  && <MenuItemsList restaurantId={restaurantId} />}
-          {activeTab === "add"   && <AddItemForm   restaurantId={restaurantId} onAdded={() => { setItemCount(p => p + 1); setActiveTab("menu"); }} />}
+          {activeTab === "menu" && <MenuItemsList restaurantId={restaurantId} />}
+          {activeTab === "add" && <AddItemForm restaurantId={restaurantId} onAdded={() => { setItemCount(p => p + 1); setActiveTab("menu"); }} />}
           {activeTab === "sales" && <SalesPlaceholder />}
         </div>
       </div>

@@ -21,8 +21,10 @@ const Navbar = () => {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
-  const isLoginPage =
-    location.pathname === "/login" || location.pathname === "/select-role";
+  const isAuthPage =
+    location.pathname === "/login" || 
+    location.pathname === "/register" || 
+    location.pathname === "/select-role";
 
   // Deepen shadow on scroll
   useEffect(() => {
@@ -79,7 +81,7 @@ const Navbar = () => {
     navigate("/login");
   };
 
-  if (isLoginPage) return null;
+  if (isAuthPage) return null;
 
   // ── Shared link hover style helpers ──
   const menuLinkBase: React.CSSProperties = { color: "#d1d5db" };

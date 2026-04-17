@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import RiderOnboardingForm from "../../components/Rider/RiderOnboardingForm";
 import RiderActiveDashboard from "../../components/Rider/RiderActiveDashboard";
 import { useApp } from "../../Context/MainContext";
-import { fetchRiderProfile, RiderProfile } from "../../services/api";
+import { fetchRiderProfile } from "../../services/api";
+import { RiderProfile } from "../../types";
 
 const RiderDashboard = () => {
   const [loading, setLoading] = useState(true);

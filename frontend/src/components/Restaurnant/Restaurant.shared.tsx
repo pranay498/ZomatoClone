@@ -1,14 +1,14 @@
 import React from "react";
-import apiClient from  "../../services/apiClient"
+import apiClient from "../../services/apiClient"
 import { IMenuItem } from "../../types";
 
 
-export const gold       = "#d4af64";
+export const gold = "#d4af64";
 export const goldBorder = "rgba(212,175,100,0.25)";
-export const goldFaint  = "rgba(212,175,100,0.18)";
-export const textMuted  = "rgba(200,175,130,0.5)";
-export const textBody   = "rgba(200,175,130,0.75)";
-export const cardBg     = "linear-gradient(155deg, rgba(20,15,7,0.98) 0%, rgba(11,8,3,0.99) 100%)";
+export const goldFaint = "rgba(212,175,100,0.18)";
+export const textMuted = "rgba(200,175,130,0.5)";
+export const textBody = "rgba(200,175,130,0.75)";
+export const cardBg = "linear-gradient(155deg, rgba(20,15,7,0.98) 0%, rgba(11,8,3,0.99) 100%)";
 
 export const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 10, letterSpacing: "0.2em",
@@ -72,28 +72,3 @@ export const PlusIcon = () => (
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
-
-
-export const menuApi = {
-  /** GET  /api/v1/menu/restaurant/:restaurantId  — fetch all items for a restaurant */
-  getAll: async (restaurantId: string): Promise<IMenuItem[]> => {
-    const res = await apiClient.get(`/menu/restaurant/${restaurantId}`);
-    return res.data.data;
-  },
- 
-  /** POST  /api/v1/menu/create  — add a new menu item */
-  add: async (restaurantId: string, data: FormData): Promise<IMenuItem> => {
-    const res = await apiClient.post(`/menu/create`, data);
-    return res.data.data;
-  },
- 
-  /** DELETE  /api/v1/menu/:itemId  — remove a menu item */
-  remove: async (itemId: string): Promise<void> => {
-    await apiClient.delete(`/menu/${itemId}`);
-  },
- 
-  /** PATCH  /api/v1/menu/:itemId/toggle  — toggle availability */
-  toggleAvailability: async (itemId: string, isAvailable: boolean): Promise<void> => {
-    await apiClient.patch(`/menu/${itemId}/toggle`);
-},
-};

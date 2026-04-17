@@ -16,16 +16,28 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Find user by email
-  const user = await User.findOne({ email });
+  console.log("🔵 [Login] Attempt for:", email);
+  const user = await User.findOne({ email }).select("+password");
+  
   if (!user) {
+    console.log("❌ [Login] User not found");
     throw new AppError("Invalid email or password", 401);
   }
 
+  console.log("🟢 [Login] User found. ID:", user._id);
+  console.log("🟢 [Login] Password hash in DB:", user.password ? "Found (" + user.password.substring(0, 15) + "...)" : "Missing!");
+
   // Check if password is correct
-  // const isPasswordValid = await comparePassword(password, user.password);
-  // if (!isPasswordValid) {
-  //   throw new AppError("Invalid email or password", 401);
-  // }
+  if (!user.password) {
+    throw new AppError("This account uses social login. Please sign in with Google.", 401);
+  }
+
+  const isPasswordValid = await comparePassword(password, user.password);
+  console.log("🔍 [Login] isPasswordValid:", isPasswordValid);
+
+  if (!isPasswordValid) {
+    throw new AppError("Invalid email or password", 401);
+  }
 
   // Generate tokens
   const accessToken = generateToken({
@@ -89,6 +101,8 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   // Hash password
   const hashedPassword = await hashPassword(password);
+  console.log("🔵 [Register] Hashing password for:", email);
+  console.log("🔵 [Register] Hash generated:", hashedPassword.substring(0, 15) + "...");
 
   // Create user
   const user = await User.create({
@@ -99,6 +113,9 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     phoneNumber,
     isActive: true,
   });
+
+  console.log("🟢 [Register] User created. Password field in object:", user.password ? "Present" : "Missing (select:false)");
+
 
   // Generate tokens
   const accessToken = generateToken({

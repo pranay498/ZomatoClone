@@ -1,46 +1,11 @@
-/**
- * services/api.ts
- * All backend API calls. One function = one route.
- */
-
 import apiClient from "./apiClient"; // your axios instance
+import { RiderProfile, CreateOrderPayload, CreateOrderResponse, RazorpayOrderResponse, VerifyPaymentResponse, ConfirmCODResponse, IMenuItem } from "../types";
 
-// ── TYPES ──────────────────────────────────────────────────────────
 
-export interface CreateOrderPayload {
-  addressId: string;
-  paymentMethod: "cod" | "upi" | "card";
-  totalAmount: number;  // must match backend cart calculation
-  userPhone?: string;
-  restaurantId: string;
+export async function registerUser(payload: any): Promise<any> {
+  const res = await apiClient.post("/auth/register", payload);
+  return res.data;
 }
-
-export interface CreateOrderResponse {
-  success: boolean;
-  orderId?: string;  // MongoDB _id — use for all subsequent calls
-  status?: string;  // "pending"
-  message?: string;
-}
-
-export interface RazorpayOrderResponse {
-  success: boolean;
-  razorpayOrderId?: string;  // Razorpay order_id e.g. "order_abc123"
-  amount?: number;  // in paise
-  currency?: string;
-  message?: string;
-}
-
-export interface VerifyPaymentResponse {
-  success: boolean;
-  message?: string;
-}
-
-export interface ConfirmCODResponse {
-  success: boolean;
-  message?: string;
-}
-
-// ── ADDRESS ────────────────────────────────────────────────────────
 
 /** POST /api/v1/user/address/validate */
 export async function validateAndSaveAddress(payload: {
@@ -210,6 +175,29 @@ export async function syncCart(payload: {
   return res.data;
 }
 
+export const menuApi = {
+  /** GET  /api/v1/menu/restaurant/:restaurantId  — fetch all items for a restaurant */
+  getAll: async (restaurantId: string): Promise<IMenuItem[]> => {
+    const res = await apiClient.get(`/menu/restaurant/${restaurantId}`);
+    return res.data.data;
+  },
+
+  /** POST  /api/v1/menu/create  — add a new menu item */
+  add: async (restaurantId: string, data: FormData): Promise<IMenuItem> => {
+    const res = await apiClient.post(`/menu/create`, data);
+    return res.data.data;
+  },
+
+  /** DELETE  /api/v1/menu/:itemId  — remove a menu item */
+  remove: async (itemId: string): Promise<void> => {
+    await apiClient.delete(`/menu/${itemId}`);
+  },
+
+  /** PATCH  /api/v1/menu/:itemId/toggle  — toggle availability */
+  toggleAvailability: async (itemId: string, isAvailable: boolean): Promise<void> => {
+    await apiClient.patch(`/menu/${itemId}/toggle`);
+  },
+};
 /**
  * DELETE /api/v1/cart/clear
  * Clears backend cart. Call ONLY after order confirmed (COD or payment verified).
@@ -217,21 +205,6 @@ export async function syncCart(payload: {
 
 // ── RIDER ──────────────────────────────────────────────────────────
 
-export interface RiderProfile {
-  _id: string;
-  userId: string;
-  name: string;
-  picture: string;
-  phoneNumber: string;
-  addharNumber: string;
-  drivingLicenseNumber: string;
-  isVerified: boolean;
-  isAvailable: boolean;
-  location: { type: "Point"; coordinates: [number, number] };
-  lastActiveAt: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 /**
  * GET /api/v1/riders/profile

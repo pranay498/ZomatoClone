@@ -8,7 +8,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import SelectedRole from "./components/SelectedRole";
 import Navbar from "./components/Navbar";
 import RestaurantPage from "./components/Restaurnant/Restaurantpage";
-import { useApp } from "./Context/MainContext";
 import RestaurantDetail from "./components/Home/RestaurantDetails";
 import AddressPaymentPage from "./pages/AddressPaymentPage";
 import CheckoutPage from "./pages/CheckoutPage";
@@ -16,6 +15,7 @@ import Orders from "./pages/Orders";
 import RiderDashboard from "./pages/Rider/RiderDashboard";
 import AccountPage from "./pages/AccountPage";
 import AdminDashboard from "./components/AdminDashboard";
+import RegisterPage from "./pages/RegisterPage";
 
 export default function App() {
 
@@ -28,6 +28,7 @@ export default function App() {
         <Routes>
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
           </Route>
 
           <Route element={<ProtectedRoute />}>

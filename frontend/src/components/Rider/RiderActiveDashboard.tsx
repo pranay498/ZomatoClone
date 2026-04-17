@@ -7,10 +7,9 @@ import {
   acceptRiderOrder,
   getCurrentRiderOrder,
   updateRiderOrderStatus,
-  RiderProfile
 } from "../../services/api";
 import { useSocket } from "../../Context/SocketContext";
-import { IOrder } from "../../types";
+import { IOrder, RiderProfile } from "../../types";
 import RiderMap from "./RiderMap";
 
 interface Props {
@@ -60,7 +59,7 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
         handleToggle();
       }, 500);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 📡 Socket Listeners
@@ -302,18 +301,21 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
               <div className="flex-1 w-full overflow-hidden">
                 <h4 className="text-amber-50 font-bold tracking-wide text-lg truncate" title={riderData.name}>{riderData.name}</h4>
                 <div className="flex items-center gap-2 mt-0.5">
-                   <p className="text-amber-500/80 text-[10px] font-mono leading-none bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">ID:{riderData.userId.slice(-6).toUpperCase()}</p>
-                   <p className="text-stone-400 text-xs leading-none">{riderData.phoneNumber}</p>
+                  <p className="text-amber-500/80 text-[10px] font-mono leading-none bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">ID:{riderData.userId.slice(-6).toUpperCase()}</p>
+                  <p className="text-stone-400 text-xs leading-none">{riderData.phoneNumber}</p>
                 </div>
               </div>
             </div>
-            
-            <button 
+
+            <button
               onClick={handleLogout}
-              className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all duration-300 border border-red-500/20 shrink-0 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]"
-              title="Logout / Sign Off"
+              className="group relative p-3 bg-red-500/5 hover:bg-red-500 text-red-500/80 hover:text-white rounded-xl transition-all duration-500 border border-red-500/10 hover:border-red-500 shrink-0 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] flex items-center justify-center overflow-hidden"
+              title="Sign Off / Logout"
             >
-              <svg className="w-5 h-5 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"></div>
+              <svg className="w-5 h-5 transition-transform duration-500 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
             </button>
           </div>
         </div>
@@ -454,10 +456,10 @@ const RiderActiveDashboard: React.FC<Props> = ({ riderData, onProfileUpdate }) =
 
                   <div className="hidden lg:block bg-black/40 border border-white/5 rounded-3xl p-6 h-full">
                     {activeOrder.deliveryAddress ? (
-                      <RiderMap 
-                        myLocation={myLocation} 
-                        customerLat={activeOrder.deliveryAddress.latitude} 
-                        customerLng={activeOrder.deliveryAddress.longitude} 
+                      <RiderMap
+                        myLocation={myLocation}
+                        customerLat={activeOrder.deliveryAddress.latitude}
+                        customerLng={activeOrder.deliveryAddress.longitude}
                       />
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-center">

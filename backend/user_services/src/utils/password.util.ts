@@ -5,8 +5,14 @@ export const hashPassword = async (password: string) => {
 };
 
 export const comparePassword = async (
- password: string,
- hash: string
+  password: string,
+  hash: string
 ) => {
- return argon2.verify(hash, password);
+  try {
+    if (!hash || typeof hash !== "string") return false;
+    return await argon2.verify(hash, password);
+  } catch (err) {
+    console.error("Password verification error:", err);
+    return false;
+  }
 };

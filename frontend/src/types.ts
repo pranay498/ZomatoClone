@@ -1,5 +1,3 @@
-
-
 export interface User {
   _id: string;
   email: string;
@@ -10,10 +8,10 @@ export interface User {
   role: "customer" | "rider" | "seller" | "admin";
 }
 
-export interface LocationData{
-    latitude: number;
-    longitude: number;
-    formattedAddress: string;
+export interface LocationData {
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
 }
 
 export interface AppContextType {
@@ -35,7 +33,7 @@ export interface AppContextType {
   setRestaurantId: React.Dispatch<React.SetStateAction<string | null>>;
   restaurantToken: string | null;
   setRestaurantToken: React.Dispatch<React.SetStateAction<string | null>>;
-} 
+}
 
 export interface City {
   name: string;
@@ -43,21 +41,21 @@ export interface City {
   country: string;
 }
 
-export interface IRestaurant{
-   _id: string;
-    name: string;
-    description: string;
-    ownerId: string;
-    phone: string | number;
-    isVerified: boolean;
-    imageUrl?: string;
-    autoLocation: {
-        type: string;
-        coordinates: [number, number];
-        formattedAddress: string;
-    };
-    isOpen: boolean;
-    createdAt: Date;
+export interface IRestaurant {
+  _id: string;
+  name: string;
+  description: string;
+  ownerId: string;
+  phone: string | number;
+  isVerified: boolean;
+  imageUrl?: string;
+  autoLocation: {
+    type: string;
+    coordinates: [number, number];
+    formattedAddress: string;
+  };
+  isOpen: boolean;
+  createdAt: Date;
 }
 
 export interface IMenuItem {
@@ -71,7 +69,7 @@ export interface IMenuItem {
   restaurantId: string;
 }
 
-export interface INearbyRestaurant extends IRestaurant { 
+export interface INearbyRestaurant extends IRestaurant {
   distanceKm?: number; // Optional distance in km (enriched client-side if not provided by backend)   
   distance?: number;   // Optional distance in meters (if backend provides it)  
 }
@@ -123,4 +121,65 @@ export interface IOrder {
   paymentId?: string;
   totalAmount: number;
   createdAt: string;
+}
+
+export interface RiderProfile {
+  _id: string;
+  userId: string;
+  name: string;
+  picture: string;
+  phoneNumber: string;
+  addharNumber: string;
+  drivingLicenseNumber: string;
+  isVerified: boolean;
+  isAvailable: boolean;
+  location: { type: "Point"; coordinates: [number, number] };
+  lastActiveAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrderPayload {
+  addressId: string;
+  paymentMethod: "cod" | "upi" | "card";
+  totalAmount: number;
+  userPhone?: string;
+  restaurantId: string;
+}
+
+export interface CreateOrderResponse {
+  success: boolean;
+  orderId?: string;  // MongoDB _id — use for all subsequent calls
+  status?: string;  // "pending"
+  message?: string;
+}
+
+export interface RazorpayOrderResponse {
+  success: boolean;
+  razorpayOrderId?: string;
+  amount?: number;
+  currency?: string;
+  message?: string;
+}
+
+export interface VerifyPaymentResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface ConfirmCODResponse {
+  success: boolean;
+  message?: string;
+}
+
+
+export interface CartSidebarProps {
+  items: ICartItem[];
+  total: number;
+  onAdd: (item: Omit<ICartItem, "quantity">) => void;
+  onRemove: (id: string) => void;
+  onClear: () => void;
+  onCheckout: () => void;
+  open: boolean;
+  onClose: () => void;
 }
