@@ -3,14 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for native modules (argon2, bcrypt, etc.)
-RUN apk add --no-cache python3 make g++
-
 # Copy dependency manifests
 COPY package*.json ./
 
-# Install all dependencies (including devDeps for build)
-RUN npm ci
+# Install dependencies (clean install)
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -23,24 +20,19 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Re-install runtime build tools (needed for native module recompile)
-RUN apk add --no-cache python3 make g++
-
-# Copy package manifests and install production deps only
-COPY --from=builder /app/package*.json ./
-RUN npm ci --omit=dev
-
-# Remove build tools after install to keep image small
-RUN apk del python3 make g++
-
-# Copy compiled app from builder
+# Copy built files from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev
 
 # Set user to non-root for security
 USER node
 
-# Expose port
-EXPOSE 8001
+# Expose port 
+EXPOSE 8009
 
 # Start the service
 CMD ["node", "dist/server.js"]
+

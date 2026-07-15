@@ -31,7 +31,7 @@ RUN npm ci --omit=dev
 USER node
 
 # Expose port
-EXPOSE 8002
+EXPOSE 8007
 
 # Start the service
 CMD ["node", "dist/server.js"]

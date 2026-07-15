@@ -88,7 +88,7 @@ export const search = asyncHandler(async (req: Request, res: Response, next: Nex
             order: "asc",
             unit: "m",
             distance_type: "arc",
-          },
+          } as any,
         }] : []),
         "_score",
       ],
