@@ -112,8 +112,12 @@ export const restaurantProxy = proxy(RESTAURANT_SERVICE_URL, {
     
     if (contentType && contentType.includes("multipart/form-data")) {
       console.log("🟡 [API Gateway] Multipart request - passing raw stream");
+      return bodyContent;
     } else if (contentType && contentType.includes("application/json")) {
-      console.log("🟡 [API Gateway] JSON request - body will be streamed");
+      console.log("🟡 [API Gateway] JSON request - body will be serialized from parsed req.body");
+      if (srcReq.body && Object.keys(srcReq.body).length > 0) {
+        return JSON.stringify(srcReq.body);
+      }
     }
     
     return bodyContent;  // Pass body through as-is

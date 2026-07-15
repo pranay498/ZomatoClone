@@ -72,6 +72,36 @@ export const createOrder = asyncHandler(
 
     const savedOrder = await newOrder.save();
 
+    // 📡 Send a preview notification to the restaurant for COD orders so they know one is incoming.
+    // ⚠️  DO NOT mark paymentStatus as "paid" here — that must happen through confirmCODOrder
+    //      → RabbitMQ → paymentConsumer so the restaurant's order list filter works correctly.
+    if (paymentMethod === "cod") {
+      try {
+        await axios.post(
+          `${process.env.REALTIME_SERVICE_URL}/internal/notify`,
+          {
+            event: "NEW_ORDER_PLACED",
+            room: `restaurant:${savedOrder.restaurantId}`,
+            payload: {
+              orderId: savedOrder._id,
+              status: "pending",
+              paymentMethod: savedOrder.paymentMethod,
+            },
+          },
+          {
+            headers: {
+              "x-internal-key": process.env.INTERNAL_SERVICE_KEY,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        console.log(`📡 [createOrder] COD preview — Restaurant notified for order ${savedOrder._id}`);
+      } catch (err: any) {
+        // Non-fatal: order is still saved, notification failure should not fail the request
+        console.error("❌ [createOrder] Failed to notify restaurant via realtime:", err.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: "Order created",

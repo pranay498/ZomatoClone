@@ -5,6 +5,7 @@ import { AppError } from "../utils/AppError";
 import { asyncHandler } from "../utils/asyncHandler";
 import cloudinary from "../config/cloudinary";
 import { fileToDataUri } from "../config/datauri";
+import { publishSearchEvent } from "../config/searchConsumer";
 
 /**
  * Create menu item with image upload
@@ -34,8 +35,8 @@ export const createMenuItemWithImage = asyncHandler(
       return next(
         new AppError(
           "Missing required fields: restaurantId, name, description, price",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -47,13 +48,18 @@ export const createMenuItemWithImage = asyncHandler(
     });
 
     if (!restaurant) {
-      console.log("🔴 [MenuItemController] Restaurant not found or unauthorized");
+      console.log(
+        "🔴 [MenuItemController] Restaurant not found or unauthorized",
+      );
       return next(
-        new AppError("Restaurant not found or you are not authorized", 404)
+        new AppError("Restaurant not found or you are not authorized", 404),
       );
     }
 
-    console.log("🟢 [MenuItemController] Restaurant verified:", restaurant.name);
+    console.log(
+      "🟢 [MenuItemController] Restaurant verified:",
+      restaurant.name,
+    );
 
     // Validate price - convert to number first (FormData sends as string)
     const numPrice = parseFloat(price);
@@ -79,13 +85,21 @@ export const createMenuItemWithImage = asyncHandler(
         console.log("🟢 [MenuItemController] Image uploaded to Cloudinary");
         console.log("🟢 [MenuItemController] Cloudinary URL:", imageUrl);
       } catch (uploadError) {
-        console.error("🔴 [MenuItemController] Cloudinary upload error:", uploadError);
+        console.error(
+          "🔴 [MenuItemController] Cloudinary upload error:",
+          uploadError,
+        );
         return next(
-          new AppError(`Failed to upload image: ${uploadError || "Unknown error"}`, 500)
+          new AppError(
+            `Failed to upload image: ${uploadError || "Unknown error"}`,
+            500,
+          ),
         );
       }
     } else {
-      console.log("🟡 [MenuItemController] No file provided - image is optional");
+      console.log(
+        "🟡 [MenuItemController] No file provided - image is optional",
+      );
     }
 
     // Create menu item in database
@@ -98,6 +112,15 @@ export const createMenuItemWithImage = asyncHandler(
       price: numPrice,
       isAvailable: isAvailable !== false, // defaults to true
     });
+    await publishSearchEvent("MENU_ITEM_CREATED", {
+      menuItemId: menuItem._id,
+      restaurantId: restaurant._id,
+      restaurantName: restaurant.name,
+      name: menuItem.name,
+      description: menuItem.description,
+      price: menuItem.price,
+      image: menuItem.image,
+    });
 
     console.log("🟢 [MenuItemController] Menu item created successfully");
     console.log("🟢 [MenuItemController] Sending response");
@@ -107,7 +130,7 @@ export const createMenuItemWithImage = asyncHandler(
       message: "Menu item created successfully",
       data: menuItem,
     });
-  }
+  },
 );
 
 /**
@@ -145,7 +168,11 @@ export const getMenuItemsByRestaurant = asyncHandler(
     console.log("🟢 [MenuItemController] Querying menu items");
     const menuItems = await MenuItem.find(query).sort({ createdAt: -1 });
 
-    console.log("🟢 [MenuItemController] Found", menuItems.length, "menu items");
+    console.log(
+      "🟢 [MenuItemController] Found",
+      menuItems.length,
+      "menu items",
+    );
     console.log("🟢 [MenuItemController] Sending response");
 
     res.status(200).json({
@@ -154,7 +181,7 @@ export const getMenuItemsByRestaurant = asyncHandler(
       count: menuItems.length,
       data: menuItems,
     });
-  }
+  },
 );
 
 /**
@@ -171,7 +198,7 @@ export const getMenuItemById = asyncHandler(
     console.log("🟢 [MenuItemController] Fetching menu item:", id);
     const menuItem = await MenuItem.findById(id).populate(
       "restaurantId",
-      "name description imageUrl phone"
+      "name description imageUrl phone",
     );
 
     if (!menuItem) {
@@ -187,7 +214,7 @@ export const getMenuItemById = asyncHandler(
       message: "Menu item retrieved successfully",
       data: menuItem,
     });
-  }
+  },
 );
 
 /**
@@ -230,10 +257,10 @@ export const updateMenuItem = asyncHandler(
 
     if (!restaurant) {
       console.log(
-        "🔴 [MenuItemController] Unauthorized: You are not the restaurant owner"
+        "🔴 [MenuItemController] Unauthorized: You are not the restaurant owner",
       );
       return next(
-        new AppError("You are not authorized to update this menu item", 403)
+        new AppError("You are not authorized to update this menu item", 403),
       );
     }
 
@@ -263,13 +290,24 @@ export const updateMenuItem = asyncHandler(
         const imageUrl = (req.file as any).path || null;
         if (imageUrl) {
           menuItem.image = imageUrl;
-          console.log("🟢 [MenuItemController] Image uploaded to Cloudinary successfully");
-          console.log("🟢 [MenuItemController] Cloudinary URL:", menuItem.image);
+          console.log(
+            "🟢 [MenuItemController] Image uploaded to Cloudinary successfully",
+          );
+          console.log(
+            "🟢 [MenuItemController] Cloudinary URL:",
+            menuItem.image,
+          );
         }
       } catch (uploadError) {
-        console.error("🔴 [MenuItemController] Cloudinary upload error:", uploadError);
+        console.error(
+          "🔴 [MenuItemController] Cloudinary upload error:",
+          uploadError,
+        );
         return next(
-          new AppError(`Failed to upload image: ${uploadError || "Unknown error"}`, 500)
+          new AppError(
+            `Failed to upload image: ${uploadError || "Unknown error"}`,
+            500,
+          ),
         );
       }
     }
@@ -283,6 +321,16 @@ export const updateMenuItem = asyncHandler(
 
     await menuItem.save();
 
+    await publishSearchEvent("MENU_ITEM_UPDATED", {
+      menuItemId: menuItem._id,
+      restaurantId: menuItem.restaurantId,
+      ...(name && { name: menuItem.name }),
+      ...(description && { description: menuItem.description }),
+      ...(numPrice !== undefined && { price: menuItem.price }),
+      ...(req.file && { image: menuItem.image }),
+      ...(isAvailable !== undefined && { isAvailable: menuItem.isAvailable }),
+    });
+
     console.log("🟢 [MenuItemController] Menu item updated successfully");
     console.log("🟢 [MenuItemController] Sending response");
 
@@ -291,7 +339,7 @@ export const updateMenuItem = asyncHandler(
       message: "Menu item updated successfully",
       data: menuItem,
     });
-  }
+  },
 );
 
 /**
@@ -326,10 +374,10 @@ export const deleteMenuItem = asyncHandler(
 
     if (!restaurant) {
       console.log(
-        "🔴 [MenuItemController] Unauthorized: You are not the restaurant owner"
+        "🔴 [MenuItemController] Unauthorized: You are not the restaurant owner",
       );
       return next(
-        new AppError("You are not authorized to delete this menu item", 403)
+        new AppError("You are not authorized to delete this menu item", 403),
       );
     }
 
@@ -339,6 +387,10 @@ export const deleteMenuItem = asyncHandler(
     console.log("🟢 [MenuItemController] Deleting menu item from database");
     await MenuItem.findByIdAndDelete(id);
 
+    await publishSearchEvent("MENU_ITEM_DELETED", {
+      menuItemId: id,
+    });
+
     console.log("🟢 [MenuItemController] Menu item deleted successfully");
     console.log("🟢 [MenuItemController] Sending response");
 
@@ -347,7 +399,7 @@ export const deleteMenuItem = asyncHandler(
       message: "Menu item deleted successfully",
       data: null,
     });
-  }
+  },
 );
 
 /**
@@ -362,7 +414,10 @@ export const toggleMenuItemAvailability = asyncHandler(
     const { id } = req.params;
     const ownerId = req.userId;
 
-    console.log("🟢 [MenuItemController] Request to toggle availability for:", id);
+    console.log(
+      "🟢 [MenuItemController] Request to toggle availability for:",
+      id,
+    );
 
     // Fetch menu item
     console.log("🟢 [MenuItemController] Fetching menu item");
@@ -382,10 +437,10 @@ export const toggleMenuItemAvailability = asyncHandler(
 
     if (!restaurant) {
       console.log(
-        "🔴 [MenuItemController] Unauthorized: You are not the restaurant owner"
+        "🔴 [MenuItemController] Unauthorized: You are not the restaurant owner",
       );
       return next(
-        new AppError("You are not authorized to toggle this menu item", 403)
+        new AppError("You are not authorized to toggle this menu item", 403),
       );
     }
 
@@ -396,11 +451,16 @@ export const toggleMenuItemAvailability = asyncHandler(
       "🟢 [MenuItemController] Toggling isAvailable from",
       menuItem.isAvailable,
       "to",
-      !menuItem.isAvailable
+      !menuItem.isAvailable,
     );
     menuItem.isAvailable = !menuItem.isAvailable;
 
     await menuItem.save();
+
+    await publishSearchEvent("MENU_ITEM_TOGGLED", {
+      menuItemId: menuItem._id,
+      isAvailable: menuItem.isAvailable,
+    });
 
     console.log("🟢 [MenuItemController] Availability toggled successfully");
     console.log("🟢 [MenuItemController] Sending response");
@@ -410,5 +470,5 @@ export const toggleMenuItemAvailability = asyncHandler(
       message: `Menu item is now ${menuItem.isAvailable ? "available" : "unavailable"}`,
       data: menuItem,
     });
-  }
+  },
 );

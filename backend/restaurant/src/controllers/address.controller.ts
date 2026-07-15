@@ -3,14 +3,14 @@ import { Address } from "../models/Address";
 
 export const validateAndSaveAddress = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = (req as any).userId; // From requireAuth middleware
+        const userId = req.userId; // From requireAuth middleware
 
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });
             return;
         }
 
-        const { fullAddress, addressLine2, landmark, city, state, pincode, addressType, coordinates } = req.body;
+        const { fullAddress, addressLine2, landmark, city, state, pincode, addressType, coordinates, phoneNumber } = req.body;
 
         const newAddress = new Address({
             userId,
@@ -20,6 +20,7 @@ export const validateAndSaveAddress = async (req: Request, res: Response): Promi
             city,
             state,
             pincode,
+            phoneNumber,
             addressType,
             coordinates
         });
@@ -39,7 +40,7 @@ export const validateAndSaveAddress = async (req: Request, res: Response): Promi
 
 export const getSavedAddresses = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = (req as any).userId;
+        const userId = req.userId;
 
         if (!userId) {
             res.status(401).json({ success: false, message: "Unauthorized" });

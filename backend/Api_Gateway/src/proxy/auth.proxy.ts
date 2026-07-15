@@ -38,7 +38,13 @@ export const authProxy = proxy(
 
         },
 
-
+        /* BODY — re-serialize so Content-Length is set correctly */
+        proxyReqBodyDecorator: (bodyContent, srcReq) => {
+            if (srcReq.body && Object.keys(srcReq.body).length > 0) {
+                return JSON.stringify(srcReq.body);
+            }
+            return bodyContent;
+        },
 
         proxyErrorHandler: (err, res, next) => {
 
@@ -49,8 +55,7 @@ export const authProxy = proxy(
         },
 
         timeout: 5000,
-        
-        parseReqBody: false
+        parseReqBody: true
 
     }
 )

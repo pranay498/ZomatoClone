@@ -24,8 +24,12 @@ const RestaurantPage: React.FC = () => {
     apiClient.get("/restaurant/my-restaurant")
       .then(res => {
         if (res.data.success) {
-          setRestaurant(res.data.data);
-          setRestaurantId(res.data.restaurantId || res.data.data._id);
+          const fetchedRestaurant = res.data.data;
+          const fetchedId = res.data.restaurantId || fetchedRestaurant._id;
+          setRestaurant(fetchedRestaurant);
+          setRestaurantId(fetchedId);
+          // 💾 Persist so SocketContext can join the restaurant room on reconnect
+          localStorage.setItem("restaurantId", fetchedId);
         }
       })
       .catch(err => {

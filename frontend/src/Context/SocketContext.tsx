@@ -62,6 +62,17 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     newSocket.on("connect", () => {
       console.log("✅ [Frontend] Socket connected:", newSocket.id);
       console.log("✅ [Frontend] Token sent:", token?.substring(0, 20) + "...");
+
+      // 🏪 If the user is a seller, join their restaurant room so they receive order notifications
+      const storedRestaurantId = localStorage.getItem("restaurantId");
+      if (storedRestaurantId) {
+        newSocket.emit("join_restaurant_room", { restaurantId: storedRestaurantId });
+        console.log("📍 [Frontend] Requested to join restaurant room:", storedRestaurantId);
+      }
+    });
+
+    newSocket.on("joined_restaurant_room", ({ room }: { room: string }) => {
+      console.log("✅ [Frontend] Joined restaurant room:", room);
     });
 
     newSocket.on("disconnect", () => {

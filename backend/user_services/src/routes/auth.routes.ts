@@ -1,8 +1,7 @@
 import express, { Router } from "express";
 import { login, register, googleCallback, addRole, getProfile } from "../controllers/auth.controller";
-import { googleClient } from "../config/googleConfig";
-import { AppError } from "../utils/AppError";
 import { requireAuth } from "../middlewares/auth.middleware";
+
 
 const router: Router = express.Router();
 

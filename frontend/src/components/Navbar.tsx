@@ -1,10 +1,135 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../Context/MainContext";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FiSearch, FiMenu, FiX, FiShoppingBag, FiChevronDown, FiHome } from "react-icons/fi";
 import { HiOutlineLocationMarker } from "react-icons/hi";
 import { MdAccountCircle, MdLogout } from "react-icons/md";
 import toast from "react-hot-toast";
+import { useAutocomplete } from "../hooks/useAutocomplete";
+import { AutocompleteResponse, AutocompleteRestaurant, AutocompleteMenuItem } from "../types";
+
+// ── Search Dropdown — extracted OUTSIDE Navbar so React reuses the same
+// component instance across renders (no unmount/remount on every keystroke)
+interface SearchDropdownProps {
+  autocompleteLoading: boolean;
+  flatResults: Array<(AutocompleteRestaurant & { type: "restaurant" }) | (AutocompleteMenuItem & { type: "menuItem" })>;
+  autocompleteData: AutocompleteResponse;
+  activeIndex: number;
+  searchQuery: string;
+  setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
+  goToResult: (result: { type: "restaurant" | "menuItem"; restaurantId: string }) => void;
+  handleSearch: () => void;
+}
+
+const SearchDropdown = ({
+  autocompleteLoading,
+  flatResults,
+  autocompleteData,
+  activeIndex,
+  searchQuery,
+  setActiveIndex,
+  goToResult,
+  handleSearch,
+}: SearchDropdownProps) => (
+  <div
+    role="listbox"
+    aria-label="Search suggestions"
+    className="absolute left-0 right-0 top-full mt-2 rounded-2xl overflow-hidden max-h-96 overflow-y-auto z-50"
+    style={{
+      background: "#1c1c1c",
+      border: "1px solid rgba(212,175,55,0.2)",
+      boxShadow: "0 24px 64px rgba(0,0,0,0.7)",
+    }}
+  >
+    {autocompleteLoading && (
+      <div className="px-4 py-3 text-xs" style={{ color: "#6b7280" }}>
+        Searching…
+      </div>
+    )}
+
+    {!autocompleteLoading && flatResults.length === 0 && (
+      <div className="px-4 py-3 text-xs" style={{ color: "#6b7280" }}>
+        No results for "{searchQuery}"
+      </div>
+    )}
+
+    {autocompleteData.restaurants.length > 0 && (
+      <div className="py-1.5">
+        <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
+          Restaurants
+        </p>
+        {autocompleteData.restaurants.map((r) => {
+          const idx = flatResults.findIndex((f) => f.type === "restaurant" && f.restaurantId === r.restaurantId);
+          const active = idx === activeIndex;
+          return (
+            <button
+              key={r.restaurantId}
+              role="option"
+              aria-selected={active}
+              onMouseEnter={() => setActiveIndex(idx)}
+              onClick={() => goToResult({ type: "restaurant", ...r })}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-all duration-150"
+              style={{
+                color: "#d1d5db",
+                background: active ? "rgba(212,175,55,0.09)" : "transparent",
+              }}
+            >
+              <HiOutlineLocationMarker style={{ color: "#e8c14e" }} />
+              {r.name}
+            </button>
+          );
+        })}
+      </div>
+    )}
+
+    {autocompleteData.menuItems.length > 0 && (
+      <div
+        className="py-1.5"
+        style={{ borderTop: autocompleteData.restaurants.length ? "1px solid rgba(255,255,255,0.06)" : "none" }}
+      >
+        <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
+          Dishes
+        </p>
+        {autocompleteData.menuItems.map((item) => {
+          const idx = flatResults.findIndex((f) => f.type === "menuItem" && f.menuItemId === item.menuItemId);
+          const active = idx === activeIndex;
+          return (
+            <button
+              key={item.menuItemId}
+              role="option"
+              aria-selected={active}
+              onMouseEnter={() => setActiveIndex(idx)}
+              onClick={() => goToResult({ type: "menuItem", restaurantId: item.restaurantId })}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-all duration-150"
+              style={{
+                color: "#d1d5db",
+                background: active ? "rgba(212,175,55,0.09)" : "transparent",
+              }}
+            >
+              {item.image ? (
+                <img src={item.image} alt={item.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: "rgba(255,255,255,0.05)" }} />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate">{item.name}</p>
+                <p className="text-xs truncate" style={{ color: "#6b7280" }}>{item.restaurantName}</p>
+              </div>
+              <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#e8c14e" }}>
+                ₹{item.price}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    )}
+
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} />
+    <button onClick={handleSearch} className="w-full px-4 py-2.5 text-xs font-bold text-left" style={{ color: "#e8c14e" }}>
+      See all results for "{searchQuery}" →
+    </button>
+  </div>
+);
 
 const Navbar = () => {
   const { isAuth, user, setIsAuth, setUser, setToken, city, loadingLocation } = useApp();
@@ -16,15 +141,32 @@ const Navbar = () => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [scrolled, setScrolled] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1); // keyboard-highlighted dropdown row
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const searchDropdownRef = useRef<HTMLDivElement>(null); // desktop dropdown outside-click
+  const mobileSearchDropdownRef = useRef<HTMLDivElement>(null); // mobile dropdown outside-click
 
   const isAuthPage =
-    location.pathname === "/login" || 
-    location.pathname === "/register" || 
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
     location.pathname === "/select-role";
+
+  // live autocomplete results as the user types
+  const { data: autocompleteData, loading: autocompleteLoading } = useAutocomplete(searchQuery);
+  const showDropdown = searchQuery.trim().length >= 2;
+
+  const flatResults = [
+    ...autocompleteData.restaurants.map((r) => ({ type: "restaurant" as const, ...r })),
+    ...autocompleteData.menuItems.map((m) => ({ type: "menuItem" as const, ...m })),
+  ];
+
+  // reset the highlighted row whenever results change
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [autocompleteData]);
 
   // Deepen shadow on scroll
   useEffect(() => {
@@ -47,12 +189,19 @@ const Navbar = () => {
         setDropdownOpen(false);
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node))
         setMobileMenuOpen(false);
+      // Close search dropdown when clicking outside either search container
+      const clickedInsideSearch =
+        (searchDropdownRef.current && searchDropdownRef.current.contains(e.target as Node)) ||
+        (mobileSearchDropdownRef.current && mobileSearchDropdownRef.current.contains(e.target as Node));
+      if (!clickedInsideSearch) {
+        setSearchQuery("");
+        setActiveIndex(-1);
+      }
     };
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, []);
 
-  // Auto-focus mobile search & clear on close
   useEffect(() => {
     if (mobileSearchOpen) {
       setTimeout(() => mobileSearchInputRef.current?.focus(), 120);
@@ -66,6 +215,52 @@ const Navbar = () => {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery("");
       setMobileSearchOpen(false);
+    }
+  };
+
+  // Stable goToResult ref used inside SearchDropdown and handleSearchKeyDown.
+  // Moved above handleSearchKeyDown so it's declared before first referenced
+  // in source order (cosmetic — closures already made this safe at runtime,
+  // since handleSearchKeyDown only *calls* goToResultCb later, on a keydown
+  // event, by which point this const is long since initialized).
+  const goToResultCb = useCallback(
+    (result: { type: "restaurant" | "menuItem"; restaurantId: string }) => {
+      navigate(`/restaurant/${result.restaurantId}`);
+      setSearchQuery("");
+      setMobileSearchOpen(false);
+      setActiveIndex(-1);
+    },
+    [navigate]
+  );
+
+  // Keyboard nav for the dropdown — arrows, enter, escape
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || flatResults.length === 0) {
+      if (e.key === "Enter") handleSearch();
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % flatResults.length);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActiveIndex((i) => (i <= 0 ? flatResults.length - 1 : i - 1));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < flatResults.length) {
+          goToResultCb(flatResults[activeIndex]);
+        } else {
+          handleSearch();
+        }
+        break;
+      case "Escape":
+        setSearchQuery("");
+        setActiveIndex(-1);
+        break;
     }
   };
 
@@ -95,9 +290,9 @@ const Navbar = () => {
   };
 
   const desktopLinks = [
-     { to: "/", icon: <FiHome className="text-lg" />, label: "Home" },
+    { to: "/", icon: <FiHome className="text-lg" />, label: "Home" },
     { to: "/account", icon: <MdAccountCircle className="text-lg" />, label: "My Account" },
-    { to: "/orders",  icon: <FiShoppingBag  className="text-base" />, label: "My Orders"  },
+    { to: "/orders", icon: <FiShoppingBag className="text-base" />, label: "My Orders" },
     ...(user?.role === "seller"
       ? [{ to: "/restaurant", icon: <span className="text-base">🍽️</span>, label: "My Restaurant" }]
       : []),
@@ -105,6 +300,9 @@ const Navbar = () => {
       ? [{ to: "/admin", icon: <span className="text-base">🛡️</span>, label: "Admin Panel" }]
       : []),
   ];
+
+  // SearchDropdown is defined OUTSIDE this component (above Navbar) to avoid
+  // React unmounting+remounting it on every keystroke due to new function references.
 
   return (
     <nav
@@ -120,7 +318,6 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 gap-4">
 
-          {/* ── Logo ── */}
           <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
@@ -148,52 +345,72 @@ const Navbar = () => {
           </Link>
 
           {/* ── Desktop Search Bar ── */}
-          <div
-            className="hidden md:flex flex-1 max-w-lg items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-200 group"
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              border: "1.5px solid rgba(212,175,55,0.28)",
-            }}
-            onFocus={(e) =>
-              (e.currentTarget.style.border = "1.5px solid rgba(212,175,55,0.7)")
-            }
-            onBlur={(e) =>
-              (e.currentTarget.style.border = "1.5px solid rgba(212,175,55,0.28)")
-            }
-          >
-            <FiSearch className="text-base flex-shrink-0" style={{ color: "#e8c14e" }} />
-            <input
-              type="text"
-              placeholder="Search restaurants, cuisines, dishes…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1 bg-transparent outline-none text-sm"
-              style={{ color: "#f3f4f6" }}
-            />
-            {searchQuery && (
-              <>
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="transition-colors"
-                  style={{ color: "#6b7280" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "#d1d5db")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "#6b7280")}
-                  aria-label="Clear search"
-                >
-                  <FiX />
-                </button>
-                <button
-                  onClick={handleSearch}
-                  className="text-xs font-bold px-3 py-1 rounded-full transition-opacity hover:opacity-90"
-                  style={{
-                    background: "linear-gradient(135deg, #f97316, #dc2626)",
-                    color: "#fff",
-                  }}
-                >
-                  Go
-                </button>
-              </>
+          <div className="hidden md:block flex-1 max-w-lg relative" ref={searchDropdownRef}>
+            <div
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-200"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1.5px solid rgba(212,175,55,0.28)",
+              }}
+            >
+              <FiSearch className="text-base flex-shrink-0" style={{ color: "#e8c14e" }} />
+              <input
+                type="text"
+                placeholder="Search restaurants, cuisines, dishes…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={(e) => {
+                  const wrapper = e.currentTarget.closest("div") as HTMLElement | null;
+                  if (wrapper) wrapper.style.border = "1.5px solid rgba(212,175,55,0.7)";
+                }}
+                onBlur={(e) => {
+                  const wrapper = e.currentTarget.closest("div") as HTMLElement | null;
+                  if (wrapper) wrapper.style.border = "1.5px solid rgba(212,175,55,0.28)";
+                }}
+                className="flex-1 bg-transparent outline-none text-sm"
+                style={{ color: "#f3f4f6" }}
+                aria-label="Search"
+                aria-autocomplete="list"
+                aria-controls="search-dropdown"
+                aria-expanded={showDropdown}
+              />
+              {searchQuery && (
+                <>
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="transition-colors"
+                    style={{ color: "#6b7280" }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "#d1d5db")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "#6b7280")}
+                    aria-label="Clear search"
+                  >
+                    <FiX />
+                  </button>
+                  <button
+                    onClick={handleSearch}
+                    className="text-xs font-bold px-3 py-1 rounded-full transition-opacity hover:opacity-90"
+                    style={{
+                      background: "linear-gradient(135deg, #f97316, #dc2626)",
+                      color: "#fff",
+                    }}
+                  >
+                    Go
+                  </button>
+                </>
+              )}
+            </div>
+            {showDropdown && (
+              <SearchDropdown
+                autocompleteLoading={autocompleteLoading}
+                flatResults={flatResults}
+                autocompleteData={autocompleteData}
+                activeIndex={activeIndex}
+                searchQuery={searchQuery}
+                setActiveIndex={setActiveIndex}
+                goToResult={goToResultCb}
+                handleSearch={handleSearch}
+              />
             )}
           </div>
 
@@ -464,14 +681,15 @@ const Navbar = () => {
 
       {/* ── Mobile Search Drawer (animated) ── */}
       <div
-        className="md:hidden overflow-hidden transition-all duration-300 ease-in-out"
+        className="md:hidden overflow-hidden transition-all duration-300 ease-in-out relative"
+        ref={mobileSearchDropdownRef}
         style={{
-          maxHeight: mobileSearchOpen ? "72px" : "0px",
+          maxHeight: mobileSearchOpen ? (showDropdown ? "500px" : "72px") : "0px",
           opacity: mobileSearchOpen ? 1 : 0,
           borderTop: mobileSearchOpen ? "1px solid rgba(212,175,55,0.15)" : "none",
         }}
       >
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 relative">
           <div
             className="flex items-center gap-2 px-4 py-2.5 rounded-full"
             style={{
@@ -486,7 +704,7 @@ const Navbar = () => {
               placeholder="Search restaurants or dishes…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onKeyDown={handleSearchKeyDown}
               className="flex-1 bg-transparent outline-none text-sm"
               style={{ color: "#f3f4f6" }}
             />
@@ -512,6 +730,18 @@ const Navbar = () => {
               </>
             )}
           </div>
+          {mobileSearchOpen && showDropdown && (
+            <SearchDropdown
+              autocompleteLoading={autocompleteLoading}
+              flatResults={flatResults}
+              autocompleteData={autocompleteData}
+              activeIndex={activeIndex}
+              searchQuery={searchQuery}
+              setActiveIndex={setActiveIndex}
+              goToResult={goToResultCb}
+              handleSearch={handleSearch}
+            />
+          )}
         </div>
       </div>
     </nav>

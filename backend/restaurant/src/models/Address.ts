@@ -8,6 +8,7 @@ export interface IAddress extends Document {
   city: string;
   state: string;
   pincode: string;
+  phoneNumber?: string;
   addressType: "home" | "work" | "other";
   coordinates?: {
     lat: number;
@@ -53,6 +54,11 @@ const AddressSchema: Schema = new Schema(
       type: String, 
       required: true, 
       trim: true 
+    },
+    phoneNumber: {
+      type: String,
+      trim: true,
+      default: "",
     },
     addressType: {
       type: String,

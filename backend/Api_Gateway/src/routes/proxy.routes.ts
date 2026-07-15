@@ -6,6 +6,7 @@ import { paymentProxy } from "../proxy/payment.proxy";
 import { realtimeProxy } from "../proxy/realtime.proxy";
 import { riderProxy } from "../proxy/rider.proxy";
 import { adminProxy } from "../proxy/admin.proxy";
+import { searchProxy } from "../proxy/search.proxy";
 import { verifyToken } from "../middlewares/auth.middleware";
 
 const router = Router();
@@ -36,6 +37,9 @@ router.use("/orders",verifyToken, restaurantProxy);
 router.use("/checkout", verifyToken, paymentProxy);
 
 router.use("/payment", verifyToken, paymentProxy);
+
+// Search service routes (public — no auth required)
+router.use("/search", searchProxy);
 
 // RealTime service routes (notifications)
 router.use("/notifications", realtimeProxy);

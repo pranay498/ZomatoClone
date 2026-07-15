@@ -183,3 +183,24 @@ export interface CartSidebarProps {
   open: boolean;
   onClose: () => void;
 }
+
+export interface AutocompleteMenuItem {
+  menuItemId: string;
+  restaurantId: string;
+  name: string;
+  restaurantName: string;
+  price: number;
+  image?: string | null;
+}
+
+export interface AutocompleteRestaurant {
+  restaurantId: string;
+  name: string;
+}
+
+export interface AutocompleteResponse {
+  success: boolean;
+  menuItems: AutocompleteMenuItem[];
+  restaurants: AutocompleteRestaurant[];
+}
+

@@ -1,17 +1,6 @@
-/**
- * services/api.ts
- * ─────────────────────────────────────────────────────────────────
- * Single source of truth for ALL backend API calls.
- * Each function maps to exactly ONE backend route.
- * ─────────────────────────────────────────────────────────────────
- */
 
-import apiClient from "./apiClient"; // axios instance with baseURL + credentials
 
-// ══════════════════════════════════════════════════════════════════
-//  TYPES
-// ══════════════════════════════════════════════════════════════════
-
+import apiClient from "./apiClient"; 
 export interface AddressPayload {
   fullAddress: string;
   addressLine2?: string;
@@ -62,15 +51,15 @@ export interface CreateOrderPayload {
 
 export interface CreateOrderResponse {
   success: boolean;
-  orderId?: string;   // MongoDB _id — store this, use for payment
-  status?: string;    // "pending"
+  orderId?: string; // MongoDB _id — store this, use for payment
+  status?: string; // "pending"
   message?: string;
 }
 
 export interface RazorpayOrderResponse {
   success: boolean;
-  orderId?: string;   // Razorpay order_id "order_xxx"
-  amount?: number;    // paise
+  orderId?: string; // Razorpay order_id "order_xxx"
+  amount?: number; // paise
   currency?: string;
   message?: string;
 }
@@ -84,7 +73,13 @@ export interface OrderStatusResponse {
   success: boolean;
   order?: {
     _id: string;
-    status: "pending" | "placed" | "rider_assigned" | "picked_up" | "delivered" | "cancelled";
+    status:
+      | "pending"
+      | "placed"
+      | "rider_assigned"
+      | "picked_up"
+      | "delivered"
+      | "cancelled";
     paymentStatus: "pending" | "paid" | "failed" | "refunded";
   };
 }
@@ -99,7 +94,7 @@ export interface OrderStatusResponse {
  * Returns addressId — store in sessionStorage for next steps.
  */
 export async function validateAndSaveAddress(
-  payload: AddressPayload
+  payload: AddressPayload,
 ): Promise<ValidateAddressResponse> {
   const res = await apiClient.post("/user/address/validate", payload);
   return res.data;
@@ -109,7 +104,10 @@ export async function validateAndSaveAddress(
  * Reverse geocode lat/lng → address using OpenStreetMap.
  * Free. No API key needed.
  */
-export async function reverseGeocodeLatLng(lat: number, lng: number): Promise<{
+export async function reverseGeocodeLatLng(
+  lat: number,
+  lng: number,
+): Promise<{
   displayName: string;
   city: string;
   state: string;
@@ -117,13 +115,13 @@ export async function reverseGeocodeLatLng(lat: number, lng: number): Promise<{
 }> {
   const res = await fetch(
     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-    { headers: { "Accept-Language": "en-US,en;q=0.9" } }
+    { headers: { "Accept-Language": "en-US,en;q=0.9" } },
   );
   const d = await res.json();
   return {
     displayName: d?.display_name ?? "",
-    city:    d?.address?.city ?? d?.address?.town ?? d?.address?.village ?? "",
-    state:   d?.address?.state ?? "",
+    city: d?.address?.city ?? d?.address?.town ?? d?.address?.village ?? "",
+    state: d?.address?.state ?? "",
     pincode: d?.address?.postcode ?? "",
   };
 }
@@ -142,7 +140,7 @@ export async function reverseGeocodeLatLng(lat: number, lng: number): Promise<{
  *   - NEVER call this again after payment starts
  */
 export async function createOrder(
-  payload: CreateOrderPayload
+  payload: CreateOrderPayload,
 ): Promise<CreateOrderResponse> {
   const res = await apiClient.post("/orders/create", payload);
   return res.data;
@@ -153,7 +151,7 @@ export async function createOrder(
  * Poll this after payment verify to confirm RabbitMQ consumer updated order.
  */
 export async function getOrderStatus(
-  orderId: string
+  orderId: string,
 ): Promise<OrderStatusResponse> {
   const res = await apiClient.get(`/orders/${orderId}`);
   return res.data;
@@ -171,7 +169,7 @@ export async function getOrderStatus(
  * so Rider Service can assign a rider.
  */
 export async function confirmCODOrder(
-  orderId: string
+  orderId: string,
 ): Promise<{ success: boolean; message?: string }> {
   const res = await apiClient.post("/orders/confirm-cod", { orderId });
   return res.data;
@@ -189,9 +187,11 @@ export async function confirmCODOrder(
  * NEVER creates/modifies your MongoDB order — only creates Razorpay order.
  */
 export async function createRazorpayOrder(
-  amount: number
+  amount: number,
 ): Promise<RazorpayOrderResponse> {
-  const res = await apiClient.post("/payment/razorpay/create-order", { amount });
+  const res = await apiClient.post("/payment/razorpay/create-order", {
+    amount,
+  });
   return res.data;
 }
 
@@ -226,7 +226,13 @@ export async function verifyRazorpayPayment(payload: {
  * Syncs local cart to backend before order creation.
  */
 export async function syncCart(payload: {
-  items: { menuItemId: string; name: string; price: number; quantity: number; imageUrl?: string }[];
+  items: {
+    menuItemId: string;
+    name: string;
+    price: number;
+    quantity: number;
+    imageUrl?: string;
+  }[];
 }): Promise<{ success: boolean }> {
   const res = await apiClient.post("/cart/sync", payload);
   return res.data;

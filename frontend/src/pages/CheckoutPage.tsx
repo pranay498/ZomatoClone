@@ -1,23 +1,3 @@
-/**
- * CheckoutPage.tsx
- * Route: /checkout
- *
- * EXACT FLOW:
- *   1. Mount → read addressId + restaurantId from sessionStorage
- *   2. createOrder() ONCE → get orderId → store in state
- *   3. User picks payment method + tip
- *   4. COD   → confirmCODOrder(orderId) → success
- *   5. UPI/Card → createRazorpayOrder(amount) → open modal
- *              → user pays → verifyRazorpayPayment({ orderId, ...sigs })
- *              → poll getOrderStatus until "placed" → success
- *
- * RULES:
- *   - createOrder called ONCE via useRef guard
- *   - orderId set BEFORE any payment call
- *   - Success shown ONLY after COD confirm OR payment verify
- *   - clearCart ONLY on success
- *   - Razorpay dismiss → back to ready (NOT success)
- */
 
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";

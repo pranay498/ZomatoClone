@@ -35,6 +35,13 @@ export const riderProxy = proxy(
             return proxyReqOpts;
         },
 
+        proxyReqBodyDecorator: (bodyContent, srcReq) => {
+            if (srcReq.body && Object.keys(srcReq.body).length > 0) {
+                return JSON.stringify(srcReq.body);
+            }
+            return bodyContent;
+        },
+
         proxyErrorHandler: (err, res, next) => {
             res.status(500).json({
                 message: "Rider service unavailable"

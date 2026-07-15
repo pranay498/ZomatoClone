@@ -72,6 +72,24 @@ export const initSocket = (server: http.Server) => {
       console.log(`📍 Joined room: restaurant:${restaurantId}`);
     }
 
+    // 🏪 Allow sellers to explicitly join their restaurant's room
+    // (restaurantId is NOT in the JWT, so client must send it after connecting)
+    socket.on("join_restaurant_room", ({ restaurantId: reqRestaurantId }: { restaurantId: string }) => {
+      const role = user?.role;
+      if (!reqRestaurantId) {
+        console.error("❌ [join_restaurant_room] No restaurantId provided");
+        return;
+      }
+      if (role !== "seller" && role !== "admin") {
+        console.error(`❌ [join_restaurant_room] Role "${role}" is not allowed to join restaurant rooms`);
+        return;
+      }
+      const roomName = `restaurant:${reqRestaurantId}`;
+      socket.join(roomName);
+      console.log(`✅ [join_restaurant_room] Socket ${socket.id} joined room: ${roomName}`);
+      socket.emit("joined_restaurant_room", { room: roomName });
+    });
+
     // Example event
     socket.on("send_message", (data) => {
       console.log("📩 Message from:", userId, data);

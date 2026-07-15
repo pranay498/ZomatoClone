@@ -1,14 +1,8 @@
 import apiClient from "./apiClient"; // your axios instance
-import { RiderProfile, CreateOrderPayload, CreateOrderResponse, RazorpayOrderResponse, VerifyPaymentResponse, ConfirmCODResponse, IMenuItem } from "../types";
+import { RiderProfile, CreateOrderPayload, CreateOrderResponse, RazorpayOrderResponse, VerifyPaymentResponse, ConfirmCODResponse, IMenuItem ,AutocompleteResponse } from "../types";
 
-
-export async function registerUser(payload: any): Promise<any> {
-  const res = await apiClient.post("/auth/register", payload);
-  return res.data;
-}
-
-/** POST /api/v1/user/address/validate */
-export async function validateAndSaveAddress(payload: {
+// ── Address types ──────────────────────────────────────────────────
+export interface AddressPayload {
   fullAddress: string;
   addressLine2?: string;
   landmark?: string;
@@ -18,7 +12,18 @@ export async function validateAndSaveAddress(payload: {
   addressType: "home" | "work" | "other";
   coordinates: { lat: number; lng: number } | null;
   phoneNumber: string;
-}): Promise<{ success: boolean; message?: string; addressId?: string }> {
+}
+
+
+export async function registerUser(payload: any): Promise<any> {
+  const res = await apiClient.post("/auth/register", payload);
+  return res.data;
+}
+
+/** POST /api/v1/user/address/validate */
+export async function validateAndSaveAddress(
+  payload: AddressPayload
+): Promise<{ success: boolean; message?: string; addressId?: string }> {
   const res = await apiClient.post("/user/address/validate", payload);
   return res.data;
 }
@@ -293,5 +298,54 @@ export async function fetchPendingRiders(): Promise<{ success: boolean; data: an
 
 export async function verifyRider(id: string): Promise<{ success: boolean; message: string }> {
   const res = await apiClient.patch(`/admin/riders/${id}/verify`);
+  return res.data;
+}
+
+/**
+ * GET /search/autocomplete?q=
+ * Pass an AbortSignal so the caller can cancel stale requests mid-flight.
+ */
+export async function getAutocomplete(
+  q: string,
+  lat?: number,
+  lng?: number,
+  signal?: AbortSignal
+): Promise<AutocompleteResponse> {
+  const res = await apiClient.get("/search/autocomplete", {
+    params: { q, lat, lng },
+    signal,
+  });
+  return res.data;
+}
+
+export interface SearchFilterParams {
+  page?: number;
+  limit?: number;
+  restaurantId?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  isAvailable?: boolean;
+  lat?: number;
+  lng?: number;
+  radius?: number;
+}
+
+export interface SearchResponse {
+  success: boolean;
+  total: number;
+  page: number;
+  limit: number;
+  data: any[];
+}
+
+export async function getSearchResults(
+  q: string,
+  filters?: SearchFilterParams,
+  signal?: AbortSignal
+): Promise<SearchResponse> {
+  const res = await apiClient.get("/search", {
+    params: { q, ...filters },
+    signal,
+  });
   return res.data;
 }

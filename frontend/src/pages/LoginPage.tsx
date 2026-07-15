@@ -1,9 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useGoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin, type CodeResponse } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import apiClient from "../services/apiClient";
 import { useApp } from "../Context/MainContext";
+
+interface LoginResponseData {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    firstName?: string;
+    lastName?: string;
+    email: string;
+    role?: string;
+    [key: string]: unknown;
+  };
+}
+
+interface LoginApiResponse {
+  data: LoginResponseData;
+}
+
+
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -35,43 +53,40 @@ const Spinner = () => (
 );
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [gLoading, setGLoading] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [checked, setChecked] = useState(false);
-  const [hoverG, setHoverG] = useState(false);
-  const [hoverS, setHoverS] = useState(false);
-  const [emailFocus, setEmailFocus] = useState(false);
-  const [passFocus, setPassFocus] = useState(false);
-  const [error, setError] = useState("");
-
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [showPass, setShowPass] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [gLoading, setGLoading] = useState<boolean>(false);
+  const [ready, setReady] = useState<boolean>(false);
+  const [checked, setChecked] = useState<boolean>(false);
+  const [hoverG, setHoverG] = useState<boolean>(false);
+  const [hoverS, setHoverS] = useState<boolean>(false);
+  const [emailFocus, setEmailFocus] = useState<boolean>(false);
+  const [passFocus, setPassFocus] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
 
   const navigate = useNavigate();
   const { setToken, setIsAuth, setUser } = useApp();
-  const authService = import.meta.env.VITE_AUTH_SERVICE_URL;
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 50);
     return () => clearTimeout(t);
   }, []);
 
-
-  const responseGoogle = async (authResult) => {
+  const responseGoogle = async (authResult: Omit<CodeResponse, "error" | "error_description" | "error_uri">) => {
     try {
-      const result = await apiClient.post("/auth/google", {
+      const result = await apiClient.post<LoginApiResponse>("/auth/google", {
         credential: authResult.code,
       });
-      console.log("Fetch", result)
+      console.log("Fetch", result);
       localStorage.setItem("accessToken", result.data.data.accessToken);
       localStorage.setItem("refreshToken", result.data.data.refreshToken);
       setToken(result.data.data.accessToken);
       setIsAuth(true);
-      setUser(result.data.data.user)
+      setUser(result.data.data.user);
       toast.success("Login successful");
-      navigate("/")
+      navigate("/");
     } catch (err) {
       console.error(err);
       toast.error("Google login failed");
@@ -98,7 +113,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const result = await apiClient.post("/auth/login", {
+      const result = await apiClient.post<LoginApiResponse>("/auth/login", {
         email,
         password,
       });
@@ -115,6 +130,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
   return (
     <>
       <style>{`
@@ -139,7 +155,6 @@ export default function LoginPage() {
         .lp-input:focus { outline: none; border-bottom-color: rgba(212,175,100,0.7) !important; }
       `}</style>
 
-      {/* ─── Page wrapper ─── */}
       <div style={{
         minHeight: "100vh",
         width: "100%",
@@ -154,7 +169,6 @@ export default function LoginPage() {
         overflow: "hidden",
       }}>
 
-        {/* Floating orbs */}
         <div style={{
           position: "absolute", top: "-8%", left: "-4%", width: 440, height: 440, borderRadius: "50%",
           background: "radial-gradient(circle, rgba(201,168,76,0.17) 0%, transparent 68%)",
@@ -171,20 +185,17 @@ export default function LoginPage() {
           filter: "blur(38px)", animation: "drift3 11s ease-in-out infinite", pointerEvents: "none"
         }} />
 
-        {/* Grid texture */}
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.035,
           backgroundImage: "linear-gradient(rgba(212,175,100,1) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,100,1) 1px, transparent 1px)",
           backgroundSize: "64px 64px"
         }} />
 
-        {/* Vignette */}
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none",
           background: "radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 100%)"
         }} />
 
-        {/* ─── Card ─── */}
         <div style={{
           position: "relative",
           width: "100%",
@@ -194,7 +205,6 @@ export default function LoginPage() {
           transform: "translateY(0px)",
           transition: "all 0.75s cubic-bezier(.16,1,.3,1)",
         }}>
-          {/* Corner brackets */}
           {[
             { top: 0, left: 0, borderTop: "1px solid rgba(212,175,100,0.38)", borderLeft: "1px solid rgba(212,175,100,0.38)" },
             { top: 0, right: 0, borderTop: "1px solid rgba(212,175,100,0.38)", borderRight: "1px solid rgba(212,175,100,0.38)" },
@@ -212,7 +222,6 @@ export default function LoginPage() {
             boxShadow: "0 0 0 1px rgba(212,175,100,0.05), 0 32px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.025)",
           }}>
 
-            {/* ── Logo ── */}
             <div style={{ textAlign: "center", marginBottom: 36 }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
                 <div style={{
@@ -255,7 +264,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* ── Google ── */}
             <button
               onMouseEnter={() => setHoverG(true)}
               onMouseLeave={() => setHoverG(false)}
@@ -279,14 +287,12 @@ export default function LoginPage() {
               <span>{gLoading ? "Authenticating…" : "Continue with Google"}</span>
             </button>
 
-            {/* ── OR divider ── */}
             <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "22px 0" }}>
               <div style={{ flex: 1, height: 1, background: "rgba(212,175,100,0.1)" }} />
               <span style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(200,175,130,0.26)" }}>or</span>
               <div style={{ flex: 1, height: 1, background: "rgba(212,175,100,0.1)" }} />
             </div>
 
-            {/* ── Email ── */}
             <div style={{ marginBottom: 24 }}>
               <label style={{
                 display: "block", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
@@ -311,7 +317,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* ── Password ── */}
             <div style={{ marginBottom: 22 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <label style={{
@@ -323,8 +328,8 @@ export default function LoginPage() {
                   fontSize: 11, color: "rgba(212,175,100,0.42)", cursor: "pointer",
                   fontStyle: "italic", letterSpacing: "0.04em", transition: "color 0.2s"
                 }}
-                  onMouseEnter={e => e.target.style.color = "#d4af64"}
-                  onMouseLeave={e => e.target.style.color = "rgba(212,175,100,0.42)"}>
+                  onMouseEnter={(e: ReactMouseEvent<HTMLSpanElement>) => (e.currentTarget.style.color = "#d4af64")}
+                  onMouseLeave={(e: ReactMouseEvent<HTMLSpanElement>) => (e.currentTarget.style.color = "rgba(212,175,100,0.42)")}>
                   Forgot password?
                 </span>
               </div>
@@ -355,7 +360,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* ── Remember me ── */}
             <div onClick={() => setChecked(!checked)}
               style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28, cursor: "pointer" }}>
               <div style={{
@@ -375,7 +379,6 @@ export default function LoginPage() {
               </span>
             </div>
 
-            {/* ── Sign In ── */}
             <button
               onMouseEnter={() => setHoverS(true)}
               onMouseLeave={() => setHoverS(false)}
@@ -400,7 +403,6 @@ export default function LoginPage() {
               <span>{loading ? "Signing In…" : "Sign In"}</span>
             </button>
 
-            {/* ── Footer ── */}
             <p style={{
               textAlign: "center", marginTop: 24, fontSize: 12,
               color: "rgba(200,175,130,0.3)", letterSpacing: "0.05em"
@@ -409,13 +411,12 @@ export default function LoginPage() {
               <span
                 onClick={() => navigate("/register")}
                 style={{ color: "rgba(212,175,100,0.5)", cursor: "pointer", fontStyle: "italic", transition: "color 0.2s" }}
-                onMouseEnter={e => e.target.style.color = "#d4af64"}
-                onMouseLeave={e => e.target.style.color = "rgba(212,175,100,0.5)"}>
+                onMouseEnter={(e: ReactMouseEvent<HTMLSpanElement>) => (e.currentTarget.style.color = "#d4af64")}
+                onMouseLeave={(e: ReactMouseEvent<HTMLSpanElement>) => (e.currentTarget.style.color = "rgba(212,175,100,0.5)")}>
                 Create one
               </span>
             </p>
 
-            {/* ── Bottom ornament ── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 22, opacity: 0.18 }}>
               <div style={{ height: 1, width: 28, background: "rgba(212,175,100,1)" }} />
               <div style={{ width: 4, height: 4, transform: "rotate(45deg)", background: "rgba(212,175,100,1)" }} />
@@ -424,7 +425,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Footer text */}
         <p style={{
           position: "absolute", bottom: 14, left: 0, right: 0, textAlign: "center",
           fontFamily: "'DM Sans', sans-serif", fontSize: 9, letterSpacing: "0.22em",

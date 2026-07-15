@@ -1,0 +1,309 @@
+name: zomato-clone
+
+# ─────────────────────────────────────────────────────────────────
+# ZomatoClone — Production Docker Compose
+#
+# Services:
+#   Infrastructure : rabbitmq, redis
+#   Backend        : api-gateway, user-service, restaurant-service,
+#                    payment-service, realtime-service, rider-service, admin-service
+#   Frontend       : frontend (Vite build served by Nginx)
+#   Edge           : nginx (public-facing reverse proxy, port 80)
+#
+# On EC2: only ports 80 (nginx) and optionally 443 are exposed to the internet.
+# All backend services communicate over the internal "orderflow-network".
+#
+# Usage:
+#   cp .env.example .env   # fill in secrets
+#   docker compose up -d --build
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ══════════════════════════════════════════════════════════════
+  # INFRASTRUCTURE
+  # ══════════════════════════════════════════════════════════════
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: orderflow-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"      # AMQP (internal services connect on this port)
+      - "15672:15672"    # Management UI — BLOCK in EC2 Security Group for prod
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orderflow-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: orderflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"      # Only needed if you inspect Redis locally; close in prod
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orderflow-network
+
+  # ══════════════════════════════════════════════════════════════
+  # BACKEND SERVICES
+  # ══════════════════════════════════════════════════════════════
+
+  api-gateway:
+    build:
+      context: ./backend/Api_Gateway
+      dockerfile: Dockerfile
+    container_name: orderflow-gateway
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      PORT: 8000
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      # Service URLs (use Docker service names, not localhost)
+      AUTH_SERVICE_URL: http://user-service:8001
+      RESTAURANT_SERVICE_URL: http://restaurant-service:8002
+      PAYMENT_SERVICE_URL: http://payment-service:8003
+      REALTIME_SERVICE_URL: http://realtime-service:8004
+      RIDER_SERVICE_URL: http://rider-service:8005
+      ADMIN_SERVICE_URL: http://admin-service:8006
+      FRONTEND_URL: http://${EC2_PUBLIC_IP:-localhost}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - orderflow-network
+
+  user-service:
+    build:
+      context: ./backend/user_services
+      dockerfile: Dockerfile
+    container_name: orderflow-user-service
+    restart: unless-stopped
+    expose:
+      - "8001"
+    environment:
+      PORT: 8001
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI_USER}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://${EC2_PUBLIC_IP:-localhost}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    networks:
+      - orderflow-network
+
+  restaurant-service:
+    build:
+      context: ./backend/restaurant
+      dockerfile: Dockerfile
+    container_name: orderflow-restaurant-service
+    restart: unless-stopped
+    expose:
+      - "8002"
+    environment:
+      PORT: 8002
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI_RESTAURANT}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      REALTIME_SERVICE_URL: http://realtime-service:8004
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASS:-admin123}@rabbitmq:5672
+      PAYMENT_QUEUE: payment_success_queue
+      ORDER_READY_QUEUE: order_ready_queue
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      FRONTEND_URL: http://${EC2_PUBLIC_IP:-localhost}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - orderflow-network
+
+  payment-service:
+    build:
+      context: ./backend/payment_service
+      dockerfile: Dockerfile
+    container_name: orderflow-payment-service
+    restart: unless-stopped
+    expose:
+      - "8003"
+    environment:
+      PORT: 8003
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI_PAYMENT}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      API_GATEWAY_URL: http://api-gateway:8000
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASS:-admin123}@rabbitmq:5672
+      PAYMENT_QUEUE: payment_success_queue
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      FRONTEND_URL: http://${EC2_PUBLIC_IP:-localhost}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - orderflow-network
+
+  realtime-service:
+    build:
+      context: ./backend/realTime
+      dockerfile: Dockerfile
+    container_name: orderflow-realtime-service
+    restart: unless-stopped
+    expose:
+      - "8004"
+    environment:
+      PORT: 8004
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      GATEWAY_URL: http://api-gateway:8000
+      FRONTEND_URL: http://${EC2_PUBLIC_IP:-localhost}
+    networks:
+      - orderflow-network
+
+  rider-service:
+    build:
+      context: ./backend/rider_service
+      dockerfile: Dockerfile
+    container_name: orderflow-rider-service
+    restart: unless-stopped
+    expose:
+      - "8005"
+    environment:
+      PORT: 8005
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI_RIDER}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+      API_GATEWAY_URL: http://api-gateway:8000
+      REALTIME_SERVICE_URL: http://realtime-service:8004
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASS:-admin123}@rabbitmq:5672
+      ORDER_READY_QUEUE: order_ready_queue
+      RIDER_QUEUE: rider_success_queue
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - orderflow-network
+
+  admin-service:
+    build:
+      context: ./backend/admin
+      dockerfile: Dockerfile
+    container_name: orderflow-admin-service
+    restart: unless-stopped
+    expose:
+      - "8006"
+    environment:
+      PORT: 8006
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI_ADMIN}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+    networks:
+      - orderflow-network
+
+  # ══════════════════════════════════════════════════════════════
+  # FRONTEND (Vite build → served by Nginx inside container)
+  # ══════════════════════════════════════════════════════════════
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # VITE_ vars are BAKED INTO the JS bundle at build time
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        VITE_RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+        # All API calls go through the public Nginx proxy
+        VITE_AUTH_SERVICE_URL: http://${EC2_PUBLIC_IP:-localhost}
+    container_name: orderflow-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - orderflow-network
+
+  # ══════════════════════════════════════════════════════════════
+  # EDGE — Nginx public reverse proxy
+  # ══════════════════════════════════════════════════════════════
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: orderflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # Uncomment for HTTPS with your certs:
+      # - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Uncomment for TLS:
+      # - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - frontend
+      - api-gateway
+      - realtime-service
+    networks:
+      - orderflow-network
+  elasticsearchContainer:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node       # no cluster formation needed for dev
+      - xpack.security.enabled=false     # dev only — see note below
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m" # cap heap, prevents ES eating all host RAM
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"|\"status\":\"yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - orderflow-network
+
+# ══════════════════════════════════════════════════════════════════
+# VOLUMES & NETWORKS
+# ══════════════════════════════════════════════════════════════════
+
+volumes:
+  rabbitmq_data:
+  redis_data:
+  es_data:
+
+networks:
+  orderflow-network:
+    driver: bridge
+

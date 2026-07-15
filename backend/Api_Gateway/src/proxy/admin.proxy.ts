@@ -6,9 +6,14 @@ const ADMIN_SERVICE_URL = process.env.ADMIN_SERVICE_URL || "http://localhost:800
 export const adminProxy = proxy(
     ADMIN_SERVICE_URL,
     {
-        /* PATH REWRITE */
+        /* PATH REWRITE
+           Gateway receives: /api/v1/admin/restaurants/pending
+           Admin service expects: /api/v1/admin/restaurants/pending
+           → forward as-is */
         proxyReqPathResolver: (req) => {
-            return req.originalUrl;
+            const path = req.originalUrl;
+            console.log(`🟡 [Admin Proxy] Forwarding: ${path}`);
+            return path;
         },
 
         /* HEADER MODIFY */
@@ -33,6 +38,13 @@ export const adminProxy = proxy(
             }
 
             return proxyReqOpts;
+        },
+
+        proxyReqBodyDecorator: (bodyContent, srcReq) => {
+            if (srcReq.body && Object.keys(srcReq.body).length > 0) {
+                return JSON.stringify(srcReq.body);
+            }
+            return bodyContent;
         },
 
         proxyErrorHandler: (err, res, next) => {

@@ -128,6 +128,13 @@ export const paymentProxy = proxy(PAYMENT_SERVICE_URL, {
 
   /* ERROR HANDLER */
 
+  proxyReqBodyDecorator: (bodyContent, srcReq) => {
+    if (srcReq.body && Object.keys(srcReq.body).length > 0) {
+      return JSON.stringify(srcReq.body);
+    }
+    return bodyContent;
+  },
+
   proxyErrorHandler: (err, res, next) => {
     console.error("🔴 [API Gateway] Proxy error:", err);
     res.status(500).json({

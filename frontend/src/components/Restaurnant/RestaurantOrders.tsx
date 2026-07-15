@@ -48,6 +48,13 @@ const RestaurantOrders = ({ restaurantId }: { restaurantId: string }) => {
     fetchOrders();
   }, [restaurantId]);
 
+  // 📡 Ensure socket is in the restaurant room (belt-and-suspenders alongside SocketContext)
+  useEffect(() => {
+    if (!socket || !restaurantId) return;
+    socket.emit("join_restaurant_room", { restaurantId });
+    console.log("📍 [RestaurantOrders] Emitted join_restaurant_room for:", restaurantId);
+  }, [socket, restaurantId]);
+
   useEffect(() => {
     if (!socket) return;
 

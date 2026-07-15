@@ -4,7 +4,9 @@ let channel: amqp.Channel;
 
 export const connectRabbitMQ = async () => {
   try {
-    const connection = await amqp.connect(process.env.RABBITMQ_URL || "amqp://localhost:5672");
+    const connection = await amqp.connect(
+      process.env.RABBITMQ_URL || "amqp://localhost:5672",
+    );
 
     channel = await connection.createChannel();
 
@@ -18,6 +20,9 @@ export const connectRabbitMQ = async () => {
       durable: true,
     });
 
+    await channel.assertQueue(process.env.SEARCH_DLQ!, {
+      durable: true,
+    });
 
     console.log("🐰 RabbitMQ connected");
 
@@ -29,7 +34,6 @@ export const connectRabbitMQ = async () => {
     connection.on("error", (err) => {
       console.log("❌ RabbitMQ error:", err);
     });
-
   } catch (error) {
     console.error("❌ RabbitMQ connection failed:", error);
   }
